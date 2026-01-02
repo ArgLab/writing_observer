@@ -93,6 +93,26 @@ document_sources = source_selector(
 EXECUTION_DAG = {
     "execution_dag": {
         "roster": course_roster(runtime=q.parameter("runtime"), course_id=q.parameter("course_id", required=True)),
+        # all documents for a student
+        'student_with_docs': q.select(
+            q.keys(
+                'writing_observer.document_list',
+                STUDENTS=q.parameter("student_id", required=True),
+                STUDENTS_path='user_id'
+            ),
+            fields={'docs': 'docs'}
+        ),
+        # a single document by explicit doc id
+        'single_student_doc_by_id': q.select(
+            q.keys(
+                'writing_observer.reconstruct',
+                STUDENTS=q.parameter("student_id", required=True),
+                STUDENTS_path='user_id',
+                RESOURCES=q.parameter("document", required=True),
+                RESOURCES_path='doc_id'
+            ),
+            fields={'text': 'text'}
+        ),
         "doc_ids": q.select(q.keys('writing_observer.last_document', STUDENTS=q.variable("roster"), STUDENTS_path='user_id'), fields={'document_id': 'doc_id'}),
         'update_docs': update_via_google(runtime=q.parameter("runtime"), doc_ids=q.variable('doc_sources')),
         "docs": q.select(q.keys('writing_observer.reconstruct', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("update_docs"), RESOURCES_path='doc_id'), fields={'text': 'text'}),
@@ -165,6 +185,26 @@ EXECUTION_DAG = {
         "roster": {
             "returns": "roster",
             "parameters": ["course_id"],
+            "output": ""
+        },
+        "student_with_docs": {
+            "returns": "student_with_docs",
+            # "parameters": ["student_id"],
+            "output": ""
+        },
+        "single_student_doc_by_id": {
+            "returns": "single_student_doc_by_id",
+            "parameters": ["student_id", "document"],
+            "output": ""
+        },
+        "single_student_all_reconstruct": {
+            "returns": "single_student_all_reconstruct",
+            "parameters": ["student_id"],
+            "output": ""
+        },
+        "single_student_docs_with_nlp_annotations": {
+            "returns": "single_student_nlp",
+            "parameters": ["student_id", "document", "nlp_options"],
             "output": ""
         },
         "document_list": {
