@@ -13,6 +13,7 @@ import asyncio
 import datetime
 import inspect
 import json
+import logging
 import os
 import time
 import traceback
@@ -39,8 +40,11 @@ import learning_observer.auth.events
 import learning_observer.adapters.adapter
 import learning_observer.blacklist
 import learning_observer.blob_storage
+import learning_observer.merkle_store as merkle_store
 
 import learning_observer.constants as constants
+
+logger = logging.getLogger(__name__)
 
 
 def compile_server_data(request):
@@ -235,72 +239,140 @@ def event_decoder_and_logger(
     request,
     headers=None,
     metadata=None,
-    session={}
 ):
     '''
-    This is the main event decoder. It is called by the
-    websocket handler to log events.
+    Main event decoder / logger factory.
 
-    Parameters:
-        request: The request object.
-        headers: The header events, which e.g. contain auth
-        metadata: Metadata about the request, such as IP. This is
-            extracted from the request, which will go away soon.
+    Returns an async generator coroutine that:
+    1. Immediately begins decoding and yielding events
+    2. Buffers decoded events until the Merkle session is initialized
+    3. Flushes the buffer once ``initialize_session(student, tool)`` is called
+    4. Streams directly into the Merkle chain from that point on
+    5. Closes the session cleanly on disconnect / exhaustion
 
-    Returns:
-        A coroutine that decodes and logs events.
+    Also exposes:
+    - ``.close``               - force-close the log/session
+    - ``.initialize_session``  - provide identity once known
 
-    We call this after the header events, with the header events in the
-    `headers` parameter. This is because we want to log the header events
-    before the body events, so they can be dropped from the Merkle tree
-    for privacy. Although in most cases, students can be reidentified
-    from the body events, the header events contain explicit identification
-    tokens. It is helpful to be able to analyze data with these dropped,
-    obfuscated, or otherwise anonymized.
-
-    At present, many body events contain auth as well. We'll want to minimize
-    this and tag those events appropriately.
-
-    HACK: We would like clean log files for the first classroom pilot.
-
-    This puts events in per-session files.
-
-    The feature flag has the non-hack implementation.
+    If the ``merkle`` feature flag is not set, falls back to the legacy
+    flat-file logger (which needs no identity).
     '''
-    if merkle_config := settings.feature_flag("merkle"):
-        import merkle_store
 
-        storage_class = merkle_store.STORES[merkle_config['store']]
-        params = merkle_config.get("params", {})
+    if merkle_config := settings.feature_flag('merkle'):
+        # ---- Merkle path ------------------------------------------------
+        storage_cls = merkle_store.STORES[merkle_config['store']]
+        params = merkle_config.get('params', {})
         if not isinstance(params, dict):
-            raise ValueError("Merkle tree params must be a dict (even an empty one)")
-        storage = storage_class(**params)
-        merkle_store.Merkle(storage)
-        session = {
-            "student": request.student,
-            "tool": request.tool
-        }
-        merkle_store.start(session)
+            raise ValueError('Merkle store params must be a dict')
 
-        def decode_and_log_event(msg):
+        storage = storage_cls(**params)
+        merkle = merkle_store.Merkle(storage, merkle_store.CATEGORIES)
+        async_merkle = merkle_store.AsyncMerkle(merkle)
+
+        # --- Deferred session state ---
+        session = None
+        session_started = False
+        session_closed = False
+        pre_session_buffer = []
+
+        async def initialize_session(student, tool):
             '''
-            Decode and store the event in the Merkle tree
+            Called once downstream stages have resolved identity.
+            Opens the Merkle session and flushes every event that
+            was buffered before identity was known.
+
+            Idempotent: subsequent calls are no-ops.
             '''
-            event = json.loads(msg)
-            merkle_store.event_to_session(event)
-            return event
+            nonlocal session, session_started
+            if session_started:
+                logger.debug(
+                    'Merkle session already initialized; ignoring duplicate call'
+                )
+                return
+
+            session = {
+                'student': [student],
+                'tool': [tool],
+            }
+
+            await async_merkle.start(session, metadata=metadata)
+
+            if headers:
+                await async_merkle.event_to_session(
+                    {'type': 'header', 'headers': headers},
+                    session,
+                    label='headers',
+                )
+
+            # Replay everything we buffered before identity was known
+            for buffered_event in pre_session_buffer:
+                await async_merkle.event_to_session(buffered_event, session)
+            pre_session_buffer.clear()
+
+            session_started = True
+            logger.debug(
+                'Merkle session initialized for student=%s tool=%s; '
+                'flushed %d buffered events',
+                student, tool, len(pre_session_buffer),
+            )
+
+        async def close_session():
+            nonlocal session_closed
+            if session_closed:
+                return
+            session_closed = True
+
+            if session_started:
+                try:
+                    await async_merkle.close_session(session)
+                except Exception:
+                    logger.exception('Failed to close merkle session')
+            elif pre_session_buffer:
+                # Connection died before we ever learned who the student was.
+                # The events are not lost (they're in the buffer), but they
+                # never made it into a Merkle chain. Log loudly.
+                logger.warning(
+                    'Merkle session closed before initialization; '
+                    '%d event(s) buffered but never persisted to a session.',
+                    len(pre_session_buffer),
+                )
+
+        async def decode_and_log_event(events):
+            '''Async generator: decode every message, persist to Merkle
+            (or buffer), yield downstream.'''
+            try:
+                async for msg in events:
+                    json_event = (
+                        msg if isinstance(msg, dict)
+                        else json.loads(msg.data)
+                    )
+
+                    if session_started:
+                        await async_merkle.event_to_session(json_event, session)
+                    else:
+                        # Identity not yet known — buffer for later flush
+                        pre_session_buffer.append(json_event)
+
+                    yield json_event
+            except Exception:
+                logger.exception('Error in merkle event pipeline')
+                raise
+            finally:
+                await close_session()
+
+        decode_and_log_event.close = close_session
+        decode_and_log_event.initialize_session = initialize_session
+        return decode_and_log_event
+
+    # ---- Legacy flat-file path (unchanged) --------------------------------
 
     global COUNT
-    # Count + PID should guarantee uniqueness.
-    # With multi-server installations, we might want to add
-    # `socket.gethostname()`, but hopefully we'll have our
-    # Merkle tree logger by then, and this will be obsolete.
-    filename = "{timestamp}-{ip:-<15}-{hip:-<15}-{session_count:0>10}-{pid}".format(
+    filename = '{timestamp}-{ip:-<15}-{hip:-<15}-{session_count:0>10}-{pid}'.format(
         ip=request.remote,
         hip=request.headers.get('X-Real-IP', ''),
         timestamp=datetime.datetime.utcnow().isoformat(),
         session_count=COUNT,
-        pid=os.getpid()
+        pid=os.getpid(),
     )
     COUNT += 1
 
@@ -313,10 +385,6 @@ def event_decoder_and_logger(
             decoder_log_closed = True
 
     async def decode_and_log_event(events):
-        '''
-        Take an aiohttp web sockets message, log it, and return
-        a clean event.
-        '''
         try:
             async for msg in events:
                 if isinstance(msg, dict):
@@ -326,10 +394,13 @@ def event_decoder_and_logger(
                 log_event.log_event(json_event, filename=filename)
                 yield json_event
         finally:
-            # done processing events, can close logfile now
             close_decoder_logfile()
 
     decode_and_log_event.close = close_decoder_logfile
+    # No-op so callers don't need to branch on which path is active
+    async def _noop_init(*args, **kwargs):
+        pass
+    decode_and_log_event.initialize_session = _noop_init
     return decode_and_log_event
 
 
@@ -378,7 +449,7 @@ async def incoming_websocket_handler(request):
     async def update_event_handler(event):
         '''We need source and auth ready before we can
         set up the `event_handler` and be ready to process
-        events
+        events.
         '''
         if not authenticated:
             return False
@@ -390,6 +461,14 @@ async def incoming_websocket_handler(request):
         else:
             metadata = event
         metadata['auth'] = authenticated
+
+        # ---- Initialize the Merkle session now that we know identity ----
+        init_session = getattr(decoder_and_logger, 'initialize_session', None)
+        if init_session:
+            student = authenticated.get(constants.USER_ID, '')
+            tool = metadata.get('source', 'unknown')
+            await init_session(student, tool)
+
         event_handler = await handle_incoming_client_event(metadata=metadata)
         reducers_last_updated = learning_observer.stream_analytics.LAST_UPDATED
         return True
@@ -427,21 +506,31 @@ async def incoming_websocket_handler(request):
                 del event['auth']
 
             if not authenticated:
-                authenticated = await learning_observer.auth.events.authenticate(
+                auth_result = await learning_observer.auth.events.authenticate(
                     request=request,
                     event=event,
                     source=''
                 )
-                if authenticated:
+                if auth_result:
+                    authenticated = auth_result
                     await ws.send_json({
                         'status': 'auth',
                         constants.USER_ID: authenticated[constants.USER_ID]
                     })
+                    # This specific event was the one that provided auth.
+                    # Tag it so we can skip it during backlog flush.
+                    event['_consumed_by_auth'] = True
+
                 await update_event_handler(event)
                 backlog.append(event)
             else:
                 while backlog:
                     prior_event = backlog.pop(0)
+                    # Skip events that were consumed by the auth system.
+                    # Content events that just happened to arrive before
+                    # auth completed are forwarded normally.
+                    if prior_event.get('_consumed_by_auth'):
+                        continue
                     prior_event.update({'auth': authenticated})
                     yield prior_event
                 event.update({'auth': authenticated})
@@ -463,13 +552,22 @@ async def incoming_websocket_handler(request):
         '''Stop processing when a terminate event is received.'''
         async for event in events:
             if event.get('event') == 'terminate':
-                debug_log('Terminate event received; shutting down connection and cleaning up logs.')
+                debug_log(
+                    'Terminate event received; shutting down connection '
+                    'and cleaning up logs.'
+                )
                 handler_close = getattr(event_handler, 'close', None)
                 if callable(handler_close):
+                    # handler_close is a sync function — call directly
                     handler_close()
+
                 decoder_close = getattr(decoder_and_logger, 'close', None)
                 if callable(decoder_close):
-                    decoder_close()
+                    # May be async (Merkle) or sync (legacy) — handle both
+                    result = decoder_close()
+                    if asyncio.iscoroutine(result):
+                        await result
+
                 await ws.close()
                 return
             yield event
