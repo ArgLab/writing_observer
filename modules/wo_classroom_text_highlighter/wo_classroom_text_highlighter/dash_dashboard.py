@@ -32,49 +32,70 @@ loading_component = dbc.Collapse([
 # Option components
 _options_toggle = f'{_prefix}-options-toggle'
 _options_toggle_count = f'{_prefix}-options-toggle-count'
-_options_collapse = f'{_prefix}-options-collapse'
-_options_close = f'{_prefix}-options-close'
-# TODO abstract these into a more generic options component
+_options_modal = f'{_prefix}-options-modal'
+_options_run = f'{_prefix}-options-run'
 _options_prefix = f'{_prefix}-options'
 _options_doc_src = f'{_options_prefix}-document-source'
 _options_width = f'{_options_prefix}-width'
 _options_height = f'{_options_prefix}-height'
 _options_hide_header = f'{_options_prefix}-hide-names'
 _options_text_information = f'{_options_prefix}-text-information'
+_options_text_information_staged = f'{_options_text_information}-staged'
 
-options_component = html.Div([
-    html.Div([
-        html.H3('Settings', className='d-inline-block'),
+# Store that holds the hash of the currently applied options.
+_applied_option_hash = f'{_options_prefix}-applied-hash'
+
+options_modal = dbc.Modal([
+    dbc.ModalHeader(dbc.ModalTitle('Settings'), close_button=True),
+    dbc.ModalBody([
+        lodrc.LODocumentSourceSelectorAIO(aio_id=_options_doc_src),
+        dbc.Card([
+            dbc.CardHeader('View Options'),
+            dbc.CardBody([
+                dbc.Label('Students per row'),
+                dbc.Input(type='number', min=1, max=10, value=2, step=1, id=_options_width),
+                dbc.Label('Height of student tile'),
+                dcc.Slider(min=100, max=800, marks=None, value=500, id=_options_height),
+                dbc.Label('Student profile'),
+                dbc.Switch(value=True, id=_options_hide_header, label='Show/Hide'),
+            ])
+        ], className='mb-3'),
+        dbc.Card([
+            dbc.CardHeader('Information Options'),
+            dbc.CardBody([
+                wo_classroom_text_highlighter.preset_component.create_layout(),
+                lodrc.WOSettings(
+                    id=_options_text_information_staged,
+                    options=wo_classroom_text_highlighter.options.OPTIONS,
+                    value=wo_classroom_text_highlighter.options.DEFAULT_VALUE,
+                    className='table table-striped align-middle'
+                )
+            ])
+        ])
+    ], style={'overflowY': 'auto'}),
+    dbc.ModalFooter(
         dbc.Button(
-            html.I(className='fas fa-close'),
-            className='float-end', id=_options_close,
-            color='transparent'),
-    ]),
-    lodrc.LODocumentSourceSelectorAIO(aio_id=_options_doc_src),
-    dbc.Card([
-        dbc.CardHeader('View Options'),
-        dbc.CardBody([
-            dbc.Label('Students per row'),
-            dbc.Input(type='number', min=1, max=10, value=2, step=1, id=_options_width),
-            dbc.Label('Height of student tile'),
-            dcc.Slider(min=100, max=800, marks=None, value=500, id=_options_height),
-            dbc.Label('Student profile'),
-            dbc.Switch(value=True, id=_options_hide_header, label='Show/Hide'),
-        ])
-    ]),
-    dbc.Card([
-        dbc.CardHeader('Information Options'),
-        dbc.CardBody([
-            wo_classroom_text_highlighter.preset_component.create_layout(),
-            lodrc.WOSettings(
-                id=_options_text_information,
-                options=wo_classroom_text_highlighter.options.OPTIONS,
-                value=wo_classroom_text_highlighter.options.DEFAULT_VALUE,
-                className='table table-striped align-middle'
-            )
-        ])
-    ])
-], className='p-2')
+            [html.I(className='fas fa-play me-2'), 'Run'],
+            id=_options_run,
+            color='success',
+            size='lg',
+            className='w-100'
+        )
+    ),
+], id=_options_modal, is_open=False, size='lg', scrollable=True,
+    style={'maxHeight': '100vh'})
+
+# Hidden store that holds the "applied" text information value.
+applied_options_store = dcc.Store(
+    id=_options_text_information,
+    data=wo_classroom_text_highlighter.options.DEFAULT_VALUE
+)
+
+# Hidden store for the pre-computed hash of the applied options.
+applied_option_hash_store = dcc.Store(
+    id=_applied_option_hash,
+    data=''
+)
 
 # Legend
 _legend = f'{_prefix}-legend'
@@ -107,6 +128,9 @@ alert_component = dbc.Alert([
     html.Div(dash_renderjson.DashRenderjson(id=_alert_error_dump), className='' if DEBUG_FLAG else 'd-none')
 ], id=_alert, color='danger', is_open=False)
 
+# Panels layout ID
+_panels_layout = f'{_prefix}-panels-layout'
+
 # Settings buttons
 input_group = dbc.InputGroup([
     dbc.InputGroupText(lodrc.LOConnectionAIO(aio_id=_websocket)),
@@ -127,12 +151,12 @@ input_group = dbc.InputGroup([
 
 
 def layout():
-    '''
-    Function to define the page's layout.
-    '''
     page_layout = html.Div([
         html.H1('Writing Observer - Classroom Text Highlighter'),
         alert_component,
+        applied_options_store,
+        applied_option_hash_store,
+        options_modal,
         html.Div([
             html.Div(input_group, className='d-flex me-2'),
             html.Div(loading_component, className='d-flex')
@@ -140,55 +164,68 @@ def layout():
         lodrc.LOPanelLayout(
             html.Div(id=_output, className='d-flex justify-content-between flex-wrap'),
             panels=[
-                {'children': options_component, 'width': '30%', 'id': _options_prefix, 'side': 'left' },
                 {'children': expanded_student_component,
                  'width': '30%', 'id': _expanded_student_panel,
                  'side': 'right'}
             ],
-            id=_options_collapse, shown=[]
+            id=_panels_layout, shown=[]
         ),
     ])
     return page_layout
 
 
 # Send the initial state based on the url hash to LO.
-# If this is not included, nothing will be returned from
-# the communication protocol.
+# Reads the pre-computed hash via State so we don't recompute.
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='sendToLOConnection'),
     Output(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'send'),
-    Input(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'state'),  # used for initial setup
+    Input(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'state'),
     Input('_pages_location', 'hash'),
     Input(lodrc.LODocumentSourceSelectorAIO.ids.kwargs_store(_options_doc_src), 'data'),
-    Input(_options_text_information, 'value')
+    Input(_applied_option_hash, 'data'),
+    State(_options_text_information, 'data')
 )
 
-# Build the UI based on what we've received from the
-# communicaton protocol
+# When the applied options store changes (initial load or Run click),
+# compute and store the hash. This is the ONLY callback that writes
+# to _applied_option_hash.
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='computeAppliedHash'),
+    Output(_applied_option_hash, 'data'),
+    Input(_options_text_information, 'data'),
+)
+
+# When Run is clicked, apply staged options and close modal.
+# This writes to _options_text_information which then triggers
+# computeAppliedHash above.
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='applyOptionsAndCloseModal'),
+    Output(_options_text_information, 'data'),
+    Output(_options_modal, 'is_open', allow_duplicate=True),
+    Input(_options_run, 'n_clicks'),
+    State(_options_text_information_staged, 'value'),
+    prevent_initial_call=True
+)
+
+# Build the UI
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='populateOutput'),
     Output(_output, 'children'),
     Input(lodrc.LOConnectionAIO.ids.ws_store(_websocket), 'data'),
-    Input(_options_text_information, 'value'),
+    Input(_options_text_information, 'data'),
     Input(_options_width, 'value'),
     Input(_options_height, 'value'),
     Input(_options_hide_header, 'value'),
-    State(_options_text_information, 'options'),
+    State(_options_text_information_staged, 'options'),
+    State(_applied_option_hash, 'data'),
 )
 
-# Toggle if the options collapse is open or not
+# Toggle the options modal open
 clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='toggleOptions'),
-    Output(_options_collapse, 'shown'),
+    ClientsideFunction(namespace=_namespace, function_name='toggleOptionsModal'),
+    Output(_options_modal, 'is_open'),
     Input(_options_toggle, 'n_clicks'),
-    State(_options_collapse, 'shown')
-)
-
-clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='closeOptions'),
-    Output(_options_collapse, 'shown', allow_duplicate=True),
-    Input(_options_close, 'n_clicks'),
-    State(_options_collapse, 'shown'),
+    State(_options_modal, 'is_open'),
     prevent_initial_call=True
 )
 
@@ -209,13 +246,11 @@ clientside_callback(
     State({'type': 'WOStudentTextTile', 'index': ALL}, 'id'),
 )
 
-# When options change, update the current option hash for all students.
-# When the option hash is different from the students internal option hash
-# a loading class is applied to each student tile.
+# When applied hash changes, push to all existing student tiles.
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateCurrentOptionHash'),
     Output({'type': 'WOStudentTextTile', 'index': ALL}, 'currentOptionHash'),
-    Input(_options_text_information, 'value'),
+    Input(_applied_option_hash, 'data'),
     State({'type': 'WOStudentTextTile', 'index': ALL}, 'id'),
 )
 
@@ -223,11 +258,11 @@ clientside_callback(
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='expandCurrentStudent'),
     Output(_expanded_student_child, 'children'),
-    Output(_options_collapse, 'shown', allow_duplicate=True),
+    Output(_panels_layout, 'shown', allow_duplicate=True),
     Input({'type': 'WOStudentTileExpand', 'index': ALL}, 'n_clicks'),
     Input({'type': 'WOStudentTile', 'index': ALL}, 'children'),
     State({'type': 'WOStudentTile', 'index': ALL}, 'id'),
-    State(_options_collapse, 'shown'),
+    State(_panels_layout, 'shown'),
     State(_expanded_student_child, 'children'),
     prevent_initial_call=True
 )
@@ -235,14 +270,13 @@ clientside_callback(
 # Close expanded student
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='closeExpandedStudent'),
-    Output(_options_collapse, 'shown', allow_duplicate=True),
+    Output(_panels_layout, 'shown', allow_duplicate=True),
     Input(_expanded_student_close, 'n_clicks'),
-    State(_options_collapse, 'shown'),
+    State(_panels_layout, 'shown'),
     prevent_initial_call=True
 )
 
-
-# Update the alert component with any errors that come through
+# Update the alert component with any errors
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateAlertWithError'),
     Output(_alert_text, 'children'),
@@ -251,40 +285,40 @@ clientside_callback(
     Input(lodrc.LOConnectionAIO.ids.error_store(_websocket), 'data')
 )
 
-# Save options as preset
+# Save options as preset (uses staged value)
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='addPreset'),
     Output(wo_classroom_text_highlighter.preset_component._store, 'data'),
     Input(wo_classroom_text_highlighter.preset_component._add_button, 'n_clicks'),
     State(wo_classroom_text_highlighter.preset_component._add_input, 'value'),
-    State(_options_text_information, 'value'),
+    State(_options_text_information_staged, 'value'),
     State(wo_classroom_text_highlighter.preset_component._store, 'data')
 )
 
-# Apply clicked preset
+# Apply clicked preset to the staged settings
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='applyPreset'),
-    Output(_options_text_information, 'value'),
+    Output(_options_text_information_staged, 'value'),
     Input({'type': wo_classroom_text_highlighter.preset_component._set_item, 'index': ALL}, 'n_clicks'),
     State(wo_classroom_text_highlighter.preset_component._store, 'data'),
     prevent_initial_call=True
 )
 
-# update loading information
+# Update loading information
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateLoadingInformation'),
     Output(_loading_collapse, 'is_open'),
     Output(_loading_progress, 'value'),
     Output(_loading_information, 'children'),
     Input(lodrc.LOConnectionAIO.ids.ws_store(_websocket), 'data'),
-    Input(_options_text_information, 'value')
+    Input(_applied_option_hash, 'data')
 )
 
-# Update legend
+# Update legend (reads from applied store)
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateLegend'),
     Output(_legend_children, 'children'),
     Output(_options_toggle_count, 'children'),
-    Input(_options_text_information, 'value'),
-    State(_options_text_information, 'options')
+    Input(_options_text_information, 'data'),
+    State(_options_text_information_staged, 'options')
 )

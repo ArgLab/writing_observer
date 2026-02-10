@@ -2,7 +2,6 @@
  * Javascript callbacks to be used with the LO Example dashboard
  */
 
-// Initialize the `dash_clientside` object if it doesn't exist
 if (!window.dash_clientside) {
   window.dash_clientside = {};
 }
@@ -12,7 +11,6 @@ const DASH_CORE_COMPONENTS = 'dash_core_components';
 const DASH_BOOTSTRAP_COMPONENTS = 'dash_bootstrap_components';
 const LO_DASH_REACT_COMPONENTS = 'lo_dash_react_components';
 
-// TODO this ought to move to a more common place
 function createDashComponent (namespace, type, props) {
   return { namespace, type, props };
 }
@@ -25,13 +23,28 @@ function determineSelectedNLPOptionsList (optionsObj) {
   );
 }
 
-// TODO this ought to move to a more common place like liblo.js
+const checkForResponse = function (s, promptHash, options) {
+  if (!('documents' in s)) { return false; }
+  const selectedDocument = s.doc_id || Object.keys(s.documents || {})[0] || '';
+  const student = s.documents[selectedDocument];
+  if (!student) { return false; }
+  return options.every(option => {
+    const hashKey = `option_hash_${option}`;
+    // For hash-dependent queries, check the hash matches
+    if (hashKey in student) {
+      return promptHash === student[hashKey];
+    }
+    // For hash-independent queries (time_on_task, activity),
+    // just check the data key exists
+    return option in student;
+  });
+};
+
 async function hashObject (obj) {
   const jsonString = JSON.stringify(obj);
   const encoder = new TextEncoder();
   const data = encoder.encode(jsonString);
 
-  // Check if crypto.subtle is available
   if (crypto && crypto.subtle) {
     try {
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -43,7 +56,6 @@ async function hashObject (obj) {
     }
   }
 
-  // Fallback to the simple hash if crypto.subtle is unavailable
   return simpleHash(jsonString);
 }
 
@@ -52,7 +64,7 @@ function simpleHash (str) {
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash |= 0; // Convert to 32-bit integer
+    hash |= 0;
   }
   return hash.toString(16);
 }
@@ -83,9 +95,9 @@ function styleStudentTile (width, height) {
 }
 
 function fetchSelectedItemsFromOptions (value, options, type) {
-  return options.reduce(function(filtered, option) {
+  return options.reduce(function (filtered, option) {
     if (value?.[option.id]?.[type]?.value) {
-      const selected = {...option, ...value[option.id]};
+      const selected = { ...option, ...value[option.id] };
       filtered.push(selected);
     }
     return filtered;
@@ -107,21 +119,63 @@ function createProcessTags (document, metrics) {
           { children: document[metric.id], color }
         );
       default:
-        break
+        break;
     }
   });
-  return createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children, className: 'sticky-top' })
+  return createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children, className: 'sticky-top' });
 }
+
+/**
+ * Check if a student has fully responded for a given hash.
+ * Inspects each document for the expected hash keys.
+ *
+ * For hash-dependent queries (like docs_with_nlp_annotations),
+ * we check `option_hash_<query>` matches the applied hash.
+ *
+ * For hash-independent queries (like time_on_task, activity),
+ * we just check the key exists on the document.
+ */
+function studentHasResponded (student, appliedHash) {
+  const documents = student.documents || {};
+  const docKeys = Object.keys(documents);
+
+  // If the student has no documents at all, they haven't responded
+  if (docKeys.length === 0) { return false; }
+
+  // Check every document the student has
+  for (const docKey of docKeys) {
+    const doc = documents[docKey];
+    if (!doc) { return false; }
+
+    // The NLP annotation hash must match the applied hash
+    const docHash = doc.option_hash_docs_with_nlp_annotations;
+    if (docHash !== appliedHash) {
+      return false;
+    }
+  }
+  return true;
+}
+
 const ClassroomTextHighlightLoadingQueries = ['docs_with_nlp_annotations', 'time_on_task', 'activity'];
 
 window.dash_clientside.wo_classroom_text_highlighter = {
   /**
-   * Send updated queries to the communication protocol.
-   * @param {object} wsReadyState LOConnection status object
-   * @param {string} urlHash query string from hash for determining course id
-   * @returns stringified json object that is sent to the communication protocl
+   * Compute the hash whenever the applied options change.
+   * This is the SINGLE source of truth for the hash.
    */
-  sendToLOConnection: async function (wsReadyState, urlHash, docKwargs, nlpValue) {
+  computeAppliedHash: async function (appliedValue) {
+    if (!appliedValue) { return ''; }
+    const h = await hashObject(appliedValue);
+    console.log('[computeAppliedHash] computed hash:', h.substring(0, 12) + '...');
+    return h;
+  },
+
+  /**
+   * Send updated queries to the communication protocol.
+   * Now triggered by the hash changing (Input) and reads
+   * the options value from State.
+   */
+  sendToLOConnection: function (wsReadyState, urlHash, docKwargs, appliedHash, nlpValue) {
     if (wsReadyState === undefined) {
       return window.dash_clientside.no_update;
     }
@@ -130,10 +184,14 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       const decodedParams = decode_string_dict(urlHash.slice(1));
       if (!decodedParams.course_id) { return window.dash_clientside.no_update; }
 
-      const optionsHash = await hashObject(nlpValue);
+      if (!appliedHash) {
+        console.log('[sendToLOConnection] No hash yet, skipping');
+        return window.dash_clientside.no_update;
+      }
+
       const nlpOptions = determineSelectedNLPOptionsList(nlpValue);
       decodedParams.nlp_options = nlpOptions;
-      decodedParams.option_hash = optionsHash;
+      decodedParams.option_hash = appliedHash;
       decodedParams.doc_source = docKwargs.src;
       decodedParams.doc_source_kwargs = docKwargs.kwargs;
       const outgoingMessage = {
@@ -143,35 +201,28 @@ window.dash_clientside.wo_classroom_text_highlighter = {
           kwargs: decodedParams
         }
       };
+      console.log('[sendToLOConnection] Sending with hash:', appliedHash.substring(0, 12) + '...');
       return JSON.stringify(outgoingMessage);
     }
     return window.dash_clientside.no_update;
   },
 
-  // toggleOptions: function (clicks, isOpen) {
-  //   if (!clicks) {
-  //     return window.dash_clientside.no_update;
-  //   }
-  //   return !isOpen;
-  // },
-
-  toggleOptions: function (clicks, shown) {
-    if (!clicks) {
-      return window.dash_clientside.no_update;
-    }
-    const optionPrefix = 'wo-classroom-text-highlighter-options';
-    if (shown.includes(optionPrefix)) {
-      shown = shown.filter(item => item !== optionPrefix);
-    } else {
-      shown = shown.concat(optionPrefix);
-    }
-    return shown;
+  toggleOptionsModal: function (clicks, isOpen) {
+    if (!clicks) { return window.dash_clientside.no_update; }
+    return !isOpen;
   },
 
-  closeOptions: function (clicks, shown) {
-    if (!clicks) { return window.dash_clientside.no_update; }
-    shown = shown.filter(item => item !== 'wo-classroom-text-highlighter-options');
-    return shown;
+  /**
+   * Apply staged options and close modal.
+   * Only writes to _options_text_information — the hash
+   * is computed by the separate computeAppliedHash callback.
+   */
+  applyOptionsAndCloseModal: function (clicks, stagedValue) {
+    if (!clicks) {
+      return [window.dash_clientside.no_update, window.dash_clientside.no_update];
+    }
+    console.log('[applyOptionsAndCloseModal] Applying staged options');
+    return [stagedValue, false];
   },
 
   adjustTileSize: function (width, height, studentIds) {
@@ -184,19 +235,16 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return Array(total).fill(show ? 'd-none' : '');
   },
 
-  updateCurrentOptionHash: async function (value, ids) {
-    const optionHash = await hashObject(value);
+  updateCurrentOptionHash: function (appliedHash, ids) {
+    if (!appliedHash) {
+      return window.dash_clientside.no_update;
+    }
     const total = ids.length;
-    return Array(total).fill(optionHash);
+    console.log('[updateCurrentOptionHash] Broadcasting hash to', total, 'tiles:', appliedHash.substring(0, 12) + '...');
+    return Array(total).fill(appliedHash);
   },
 
-  /**
-   * Build the student UI components based on the stored websocket data
-   * @param {*} wsStorageData information stored in the websocket store
-   * @returns Dash object to be displayed on page
-   */
-  populateOutput: async function (wsStorageData, value, width, height, showName, options) {
-    // console.log('wsStorageData', wsStorageData);
+  populateOutput: function (wsStorageData, value, width, height, showName, options, optionHash) {
     if (!wsStorageData?.students) {
       return 'No students';
     }
@@ -205,7 +253,8 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     const selectedHighlights = fetchSelectedItemsFromOptions(value, options, 'highlight');
     const selectedMetrics = fetchSelectedItemsFromOptions(value, options, 'metric');
 
-    const optionHash = await hashObject(value);
+    console.log('[populateOutput] Using hash:', optionHash ? optionHash.substring(0, 12) + '...' : 'NONE');
+
     const students = wsStorageData.students;
     for (const student in students) {
       const selectedDocument = students[student].doc_id || Object.keys(students[student].documents || {})[0] || '';
@@ -284,16 +333,46 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return data[preset];
   },
 
-  updateLoadingInformation: async function (wsStorageData, nlpValue) {
+  /**
+   * Update the loading bar.
+   *
+   * We use two independent approaches to determine if a student
+   * has responded:
+   * 1. The original checkForResponse (if available)
+   * 2. Our own direct hash check on document data
+   *
+   * We use whichever is more conservative (fewer students counted
+   * as responded) to ensure the loading bar stays visible.
+   */
+  updateLoadingInformation: function (wsStorageData, appliedHash) {
     const noLoading = [false, 0, ''];
-    if (!wsStorageData?.students) {
+
+    if (!wsStorageData?.students || !appliedHash) {
       return noLoading;
     }
+
     const students = wsStorageData.students;
-    const promptHash = await hashObject(nlpValue);
-    const returnedResponses = Object.values(students).filter(student => checkForResponse(student, promptHash, ClassroomTextHighlightLoadingQueries)).length;
     const totalStudents = Object.keys(students).length;
-    if (totalStudents === returnedResponses) { return noLoading; }
+
+    if (totalStudents === 0) {
+      return noLoading;
+    }
+
+    let returnedResponses = 0;
+
+    for (const studentId of Object.keys(students)) {
+      const student = students[studentId];
+      if (checkForResponse(student, appliedHash, ClassroomTextHighlightLoadingQueries)) {
+        returnedResponses++;
+      }
+    }
+
+    console.log(`[updateLoadingInformation] ${returnedResponses}/${totalStudents} responded for hash=${appliedHash.substring(0, 12)}...`);
+
+    if (totalStudents === returnedResponses) {
+      return noLoading;
+    }
+
     const loadingProgress = returnedResponses / totalStudents + 0.1;
     const outputText = `Fetching responses from server. This will take a few minutes. (${returnedResponses}/${totalStudents} received)`;
     return [true, loadingProgress, outputText];
