@@ -142,7 +142,203 @@ function studentHasResponded (student, appliedHash) {
 
 const ClassroomTextHighlightLoadingQueries = ['docs_with_nlp_annotations', 'time_on_task', 'activity'];
 
+// ── Walkthrough step definitions ──────────────────────────────────────
+const WALKTHROUGH_STEPS = [
+  {
+    title: 'Welcome to the Classroom Text Highlighter!',
+    icon: 'fas fa-chalkboard-teacher',
+    body: [
+      'This dashboard lets you see every student\'s writing at a glance, with ',
+      'color-coded highlights that surface things like grammar patterns, ',
+      'argument strength, vocabulary usage, and more.',
+      '\n\n',
+      'Let\'s walk through how to get started — it only takes a minute.'
+    ].join('')
+  },
+  {
+    title: 'Step 1 — Choose What to Highlight',
+    icon: 'fas fa-highlighter',
+    body: [
+      'Click the "Choose What to Highlight" button in the toolbar at the top. ',
+      'This opens a setup panel where you pick which analyses to run on ',
+      'your students\' writing.\n\n',
+      'You\'ll see two types of options:\n',
+      '• Highlights — color-coded annotations on the text (e.g. grammar types, ',
+      'key claims)\n',
+      '• Metrics — summary badges shown on each tile (e.g. time on task, ',
+      'active/inactive status)'
+    ].join('')
+  },
+  {
+    title: 'Step 2 — Click Run to Load Results',
+    icon: 'fas fa-play-circle',
+    body: [
+      'After choosing your highlights and metrics, click the green "Run" button ',
+      'at the bottom of the panel.\n\n',
+      'The dashboard will fetch analysis for every student in your class. ',
+      'A progress bar will appear while results load — this can take a minute ',
+      'or two for larger classes.'
+    ].join('')
+  },
+  {
+    title: 'Step 3 — Read and Explore Student Work',
+    icon: 'fas fa-search-plus',
+    body: [
+      'Each tile represents one student. Their writing is displayed with your ',
+      'chosen highlights applied directly to the text.\n\n',
+      '• Click the expand icon (⤢) on any tile to open that student\'s writing ',
+      'in a larger, more readable view.\n',
+      '• Use the "Highlight Key" button in the toolbar to see what each color means.\n',
+      '• Hover over any highlighted word to see which specific annotations apply to it.'
+    ].join('')
+  },
+  {
+    title: 'You\'re Ready!',
+    icon: 'fas fa-check-circle',
+    body: [
+      'That\'s everything you need to get started.\n\n',
+      'You can change your highlight selections at any time by clicking ',
+      '"Choose What to Highlight" again and pressing "Run."\n\n',
+      'To revisit this guide later, click the ',
+      'help button (?) in the toolbar.'
+    ].join('')
+  }
+];
+
+/**
+ * Build the walkthrough modal body for a given step index.
+ */
+function buildWalkthroughBody (step) {
+  const info = WALKTHROUGH_STEPS[step];
+  const paragraphs = info.body.split('\n').filter(Boolean).map(line =>
+    createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+      children: line,
+      className: 'mb-2',
+      style: { whiteSpace: 'pre-wrap' }
+    })
+  );
+  return createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+    children: [
+      createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+        children: createDashComponent(DASH_HTML_COMPONENTS, 'I', {
+          className: `${info.icon} fa-3x text-primary mb-3`
+        }),
+        className: 'text-center'
+      }),
+      ...paragraphs
+    ]
+  });
+}
+
+/**
+ * Build an empty-state placeholder when no student data is loaded yet.
+ */
+function buildEmptyState () {
+  return createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+    className: 'd-flex flex-column align-items-center justify-content-center text-center py-5 w-100',
+    style: { minHeight: '300px', color: '#6c757d' },
+    children: [
+      createDashComponent(DASH_HTML_COMPONENTS, 'I', {
+        className: 'fas fa-users fa-4x mb-3',
+        style: { opacity: 0.3 }
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'H4', {
+        children: 'No student data loaded yet',
+        className: 'mb-3'
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+        children: 'To get started:',
+        className: 'mb-2 fw-bold'
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+        className: 'text-start',
+        style: { maxWidth: '400px' },
+        children: [
+          createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+            className: 'mb-1',
+            children: '1. Click "Choose What to Highlight" in the toolbar above'
+          }),
+          createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+            className: 'mb-1',
+            children: '2. Select the highlights and metrics you\'d like to see'
+          }),
+          createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+            className: 'mb-1',
+            children: '3. Click the green "Run" button to load student data'
+          })
+        ]
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+        className: 'mt-3 text-muted small',
+        children: 'Click the ? button for a full walkthrough.'
+      })
+    ]
+  });
+}
+
 window.dash_clientside.wo_classroom_text_highlighter = {
+  // ── Walkthrough callbacks ────────────────────────────────────────────
+
+  /**
+   * Navigate walkthrough steps. Triggered by next, back, done, or help button.
+   * Returns the new step index (0..N-1) or -1 when dismissed.
+   */
+  navigateWalkthrough: function (nextClicks, backClicks, doneClicks, skipClicks, helpClicks, currentStep) {
+    const triggered = window.dash_clientside.callback_context?.triggered_id;
+    if (!triggered) { return window.dash_clientside.no_update; }
+
+    const totalSteps = WALKTHROUGH_STEPS.length;
+
+    switch (triggered) {
+      case 'wo-classroom-text-highlighter-walkthrough-next':
+        return Math.min(currentStep + 1, totalSteps - 1);
+      case 'wo-classroom-text-highlighter-walkthrough-back':
+        return Math.max(currentStep - 1, 0);
+      case 'wo-classroom-text-highlighter-walkthrough-done':
+      case 'wo-classroom-text-highlighter-walkthrough-skip':
+        return -1;
+      case 'wo-classroom-text-highlighter-help':
+        return 0;
+      default:
+        return window.dash_clientside.no_update;
+    }
+  },
+
+  /**
+   * Render the walkthrough modal based on the current step.
+   * Returns [title, body, backDisabled, nextStyle, doneStyle, stepCounter, isOpen].
+   */
+  renderWalkthroughStep: function (step) {
+    const totalSteps = WALKTHROUGH_STEPS.length;
+    const isOpen = step >= 0 && step < totalSteps;
+
+    if (!isOpen) {
+      return [
+        '', '', true,
+        { display: 'inline-block' },
+        { display: 'none' },
+        '',
+        false
+      ];
+    }
+
+    const info = WALKTHROUGH_STEPS[step];
+    const body = buildWalkthroughBody(step);
+    const isFirst = step === 0;
+    const isLast = step === totalSteps - 1;
+    const counter = `${step + 1} of ${totalSteps}`;
+
+    return [
+      info.title,
+      body,
+      isFirst,
+      { display: isLast ? 'none' : 'inline-block' },
+      { display: isLast ? 'inline-block' : 'none' },
+      counter,
+      true
+    ];
+  },
+
   computeAppliedHash: async function (appliedValue) {
     if (!appliedValue) { return ''; }
     const h = await hashObject(appliedValue);
@@ -216,8 +412,14 @@ window.dash_clientside.wo_classroom_text_highlighter = {
 
   populateOutput: function (wsStorageData, value, width, height, showName, options, optionHash) {
     if (!wsStorageData?.students) {
-      return 'No students';
+      return buildEmptyState();
     }
+
+    const students = wsStorageData.students;
+    if (Object.keys(students).length === 0) {
+      return buildEmptyState();
+    }
+
     let output = [];
 
     const selectedHighlights = fetchSelectedItemsFromOptions(value, options, 'highlight');
@@ -225,7 +427,6 @@ window.dash_clientside.wo_classroom_text_highlighter = {
 
     console.log('[populateOutput] Using hash:', optionHash ? optionHash.substring(0, 12) + '...' : 'NONE');
 
-    const students = wsStorageData.students;
     for (const student in students) {
       const selectedDocument = students[student].doc_id || Object.keys(students[student].documents || {})[0] || '';
       const studentTileChild = createDashComponent(
@@ -337,16 +538,6 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return [true, loadingProgress, outputText];
   },
 
-  /**
-   * Expand a student into the detail modal.
-   *
-   * Returns [modalTitle, modalBodyChild, isOpen].
-   *
-   * We extract the student's display name for the modal title
-   * and only the inner content (process tags + annotated text)
-   * for the body — avoiding the tile chrome (expand button,
-   * profile header, etc.).
-   */
   expandCurrentStudent: function (clicks, children, ids, isModalOpen, currentChild) {
     const triggeredItem = window.dash_clientside.callback_context?.triggered_id ?? null;
     if (!triggeredItem) { return window.dash_clientside.no_update; }
@@ -354,7 +545,6 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     let id = null;
 
     if (triggeredItem?.type === 'WOStudentTile') {
-      // Tile content updated while modal is already open — refresh it
       if (!isModalOpen || !currentChild) {
         return window.dash_clientside.no_update;
       }
@@ -368,19 +558,14 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     const index = ids.findIndex(item => item.index === id);
     if (index === -1) { return window.dash_clientside.no_update; }
 
-    // children[index] is the wrapper div's children array.
-    // children[index][0] is the WOStudentTextTile component.
     const tile = children[index][0];
     const tileProps = tile?.props || {};
 
-    // Build a readable student name from the profile
     const profile = tileProps.profile || {};
     const studentName = [profile.name_given, profile.name_family]
       .filter(Boolean)
       .join(' ') || 'Student';
 
-    // The actual content lives inside childComponent (metrics + annotated text).
-    // This avoids pulling in the expand button, profile header, etc.
     const innerContent = tileProps.childComponent || '';
 
     return [studentName, innerContent, true];
@@ -392,7 +577,10 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     const total = selectedHighlights.length + selectedMetrics.length;
 
     if (selectedHighlights.length === 0) {
-      return ['No options selected. Click on the `Options` to select them.', total];
+      return [
+        'No highlights selected yet. Click "Choose What to Highlight" in the toolbar, select your options, then click "Run."',
+        total
+      ];
     }
     let output = selectedHighlights.map(highlight => {
       const color = highlight.highlight.color;
@@ -410,7 +598,37 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       );
       return legendItem;
     });
-    output = output.concat('Note: words in the student text may have multiple highlights. Hover over a word for the full list of which options apply');
+    output = output.concat('Note: words in the student text may have multiple highlights. Hover over a word for the full list of which options apply.');
     return [output, total];
-  }
+  },
+
+  /**
+   * Determine the initial walkthrough step based on whether the user
+   * has previously completed/skipped it (persisted in localStorage).
+   * Also writes back to localStorage when the walkthrough is dismissed.
+   *
+   * Returns [walkthroughStep, seenFlag].
+   */
+  initWalkthroughFromStorage: function (step, hasSeenWalkthrough) {
+    // On initial load (no trigger), check localStorage flag
+    const triggered = window.dash_clientside.callback_context?.triggered_id;
+
+    if (!triggered) {
+      // Initial load: if they've seen it before, keep it closed
+      if (hasSeenWalkthrough) {
+        return [-1, true];
+      }
+      // First visit: open at step 0
+      return [0, false];
+    }
+
+    // Step changed (user navigated/dismissed/reopened)
+    if (step === -1) {
+      // User dismissed or completed — mark as seen
+      return [-1, true];
+    }
+
+    // User reopened via help button or is navigating
+    return [step, hasSeenWalkthrough];
+  },
 };

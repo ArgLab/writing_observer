@@ -45,12 +45,90 @@ _options_text_information_staged = f'{_options_text_information}-staged'
 # Store that holds the hash of the currently applied options.
 _applied_option_hash = f'{_options_prefix}-applied-hash'
 
+# ── Walkthrough DOM IDs ────────────────────────────────────────────────
+_walkthrough_prefix = f'{_prefix}-walkthrough'
+_walkthrough_store = f'{_walkthrough_prefix}-step'
+_walkthrough_modal = f'{_walkthrough_prefix}-modal'
+_walkthrough_title = f'{_walkthrough_prefix}-title'
+_walkthrough_body = f'{_walkthrough_prefix}-body'
+_walkthrough_counter = f'{_walkthrough_prefix}-counter'
+_walkthrough_back = f'{_walkthrough_prefix}-back'
+_walkthrough_next = f'{_walkthrough_prefix}-next'
+_walkthrough_done = f'{_walkthrough_prefix}-done'
+_walkthrough_skip = f'{_walkthrough_prefix}-skip'
+_walkthrough_seen_store = f'{_walkthrough_prefix}-seen'
+_help_button = f'{_prefix}-help'
+
+# ── Walkthrough persistent store (localStorage) ───────────────────────
+walkthrough_seen_store = dcc.Store(
+    id=_walkthrough_seen_store,
+    storage_type='local',
+    data=False
+)
+
+# Store holds current walkthrough step (0-based, -1 = dismissed).
+# Initialised to 0 so the walkthrough opens on first page load.
+walkthrough_store = dcc.Store(id=_walkthrough_store, data=0)
+
+walkthrough_modal = dbc.Modal(
+    [
+        dbc.ModalHeader(
+            dbc.ModalTitle(id=_walkthrough_title),
+            close_button=False,
+        ),
+        dbc.ModalBody(
+            html.Div(id=_walkthrough_body),
+            style={'minHeight': '200px'},
+        ),
+        dbc.ModalFooter(
+            html.Div([
+                html.Small(id=_walkthrough_counter, className='text-muted me-auto'),
+                dbc.Button(
+                    [html.I(className='fas fa-forward me-1'), 'Skip intro'],
+                    id=_walkthrough_skip,
+                    color='link',
+                    size='sm',
+                    className='me-auto text-muted',
+                ),
+                dbc.Button(
+                    [html.I(className='fas fa-arrow-left me-1'), 'Back'],
+                    id=_walkthrough_back,
+                    color='secondary',
+                    outline=True,
+                    size='sm',
+                    className='me-2',
+                ),
+                dbc.Button(
+                    ['Next', html.I(className='fas fa-arrow-right ms-1')],
+                    id=_walkthrough_next,
+                    color='primary',
+                    size='sm',
+                    className='me-2',
+                ),
+                dbc.Button(
+                    [html.I(className='fas fa-check me-1'), 'Get Started!'],
+                    id=_walkthrough_done,
+                    color='success',
+                    size='sm',
+                ),
+            ], className='d-flex align-items-center w-100'),
+        ),
+    ],
+    id=_walkthrough_modal,
+    is_open=False,       # <-- start closed; callback will open if needed
+    centered=True,
+    backdrop='static',
+    keyboard=False,
+    size='lg',
+)
+
+# ── Options Modal ──────────────────────────────────────────────────────
 options_modal = dbc.Modal([
-    dbc.ModalHeader(dbc.ModalTitle('Settings'), close_button=True),
+    dbc.ModalHeader(dbc.ModalTitle('Dashboard Setup'), close_button=True),
     dbc.ModalBody([
         lodrc.LODocumentSourceSelectorAIO(aio_id=_options_doc_src),
         dbc.Card([
-            dbc.CardHeader('View Options'),
+            dbc.CardHeader('Display Settings'),
             dbc.CardBody([
                 dbc.Label('Students per row'),
                 dbc.Input(type='number', min=1, max=10, value=2, step=1, id=_options_width),
@@ -61,8 +139,14 @@ options_modal = dbc.Modal([
             ])
         ], className='mb-3'),
         dbc.Card([
-            dbc.CardHeader('Information Options'),
+            dbc.CardHeader('Highlights & Metrics'),
             dbc.CardBody([
+                html.P(
+                    'Select which AI analyses to apply to student writing. '
+                    'Highlights add color-coded annotations to the text; '
+                    'metrics add summary badges to each student tile.',
+                    className='text-muted small mb-3',
+                ),
                 wo_classroom_text_highlighter.preset_component.create_layout(),
                 lodrc.WOSettings(
                     id=_options_text_information_staged,
@@ -139,31 +223,40 @@ alert_component = dbc.Alert([
 # Panels layout ID
 _panels_layout = f'{_prefix}-panels-layout'
 
-# Settings buttons
+# ── Settings toolbar ───────────────────────────────────────────────────
 input_group = dbc.InputGroup([
     dbc.InputGroupText(lodrc.LOConnectionAIO(aio_id=_websocket)),
     dbc.Button([
-        html.I(className='fas fa-cog me-1'),
-        'Options (',
+        html.I(className='fas fa-highlighter me-1'),
+        'Choose What to Highlight (',
         html.Span('0', id=_options_toggle_count),
         ')'
-    ], id=_options_toggle),
+    ], id=_options_toggle, color='primary'),
     dbc.Button(
-        'Legend',
-        id=_legend_button, color='primary'),
+        [html.I(className='fas fa-palette me-1'), 'Highlight Key'],
+        id=_legend_button, color='secondary'),
     dbc.Popover(
         id=_legend_children, target=_legend_button,
         trigger='focus', body=True, placement='bottom'),
+    dbc.Button(
+        html.I(className='fas fa-question-circle'),
+        id=_help_button,
+        color='primary',
+        title='Reopen the walkthrough guide',
+    ),
     lodrc.ProfileSidebarAIO(class_name='rounded-0 rounded-end', color='secondary'),
 ], class_name='align-items-center')
 
 
 def layout():
     page_layout = html.Div([
-        html.H1('Writing Observer - Classroom Text Highlighter'),
+        html.H1('Writing Observer — Classroom Text Highlighter'),
         alert_component,
         applied_options_store,
         applied_option_hash_store,
+        walkthrough_store,
+        walkthrough_seen_store,       # <-- ADD THIS
+        walkthrough_modal,
         options_modal,
         expanded_student_modal,
         html.Div([
@@ -178,6 +271,47 @@ def layout():
     ])
     return page_layout
 
+
+# ══════════════════════════════════════════════════════════════════════
+# Walkthrough callbacks
+# ══════════════════════════════════════════════════════════════════════
+
+# On load or when step changes, sync with localStorage to decide
+# whether to show the walkthrough.
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='initWalkthroughFromStorage'),
+    Output(_walkthrough_store, 'data', allow_duplicate=True),
+    Output(_walkthrough_seen_store, 'data'),
+    Input(_walkthrough_store, 'data'),
+    State(_walkthrough_seen_store, 'data'),
+    prevent_initial_call='initial_duplicate',
+)
+
+# Navigate between walkthrough steps (next / back / done / skip / help reopen)
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='navigateWalkthrough'),
+    Output(_walkthrough_store, 'data'),
+    Input(_walkthrough_next, 'n_clicks'),
+    Input(_walkthrough_back, 'n_clicks'),
+    Input(_walkthrough_done, 'n_clicks'),
+    Input(_walkthrough_skip, 'n_clicks'),
+    Input(_help_button, 'n_clicks'),
+    State(_walkthrough_store, 'data'),
+    prevent_initial_call=True,
+)
+
+# Render the correct step content in the walkthrough modal (unchanged)
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='renderWalkthroughStep'),
+    Output(_walkthrough_title, 'children'),
+    Output(_walkthrough_body, 'children'),
+    Output(_walkthrough_back, 'disabled'),
+    Output(_walkthrough_next, 'style'),
+    Output(_walkthrough_done, 'style'),
+    Output(_walkthrough_counter, 'children'),
+    Output(_walkthrough_modal, 'is_open'),
+    Input(_walkthrough_store, 'data'),
+)
 
 # Send the initial state based on the url hash to LO.
 clientside_callback(
