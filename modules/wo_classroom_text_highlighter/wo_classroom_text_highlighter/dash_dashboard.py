@@ -102,21 +102,29 @@ _legend = f'{_prefix}-legend'
 _legend_button = f'{_legend}-button'
 _legend_children = f'{_legend}-children'
 
-# Expanded student
+# Expanded student modal
 _expanded_student = f'{_prefix}-expanded-student'
-_expanded_student_panel = f'{_expanded_student}-panel'
+_expanded_student_modal = f'{_expanded_student}-modal'
+_expanded_student_title = f'{_expanded_student}-title'
 _expanded_student_child = f'{_expanded_student}-child'
-_expanded_student_close = f'{_expanded_student}-close'
-expanded_student_component = html.Div([
-    html.Div([
-        html.H3('Individual Student', className='d-inline-block'),
-        dbc.Button(
-            html.I(className='fas fa-close'),
-            className='float-end', id=_expanded_student_close,
-            color='transparent'),
-    ]),
-    html.Div(id=_expanded_student_child)
-], className='p-2')
+
+expanded_student_modal = dbc.Modal(
+    [
+        dbc.ModalHeader(
+            dbc.ModalTitle('Student', id=_expanded_student_title),
+            close_button=True,
+        ),
+        dbc.ModalBody(
+            html.Div(id=_expanded_student_child),
+            style={'overflowY': 'auto'},
+        ),
+    ],
+    id=_expanded_student_modal,
+    is_open=False,
+    size='xl',
+    centered=True,
+    scrollable=True,
+)
 
 # Alert Component
 _alert = f'{_prefix}-alert'
@@ -157,17 +165,14 @@ def layout():
         applied_options_store,
         applied_option_hash_store,
         options_modal,
+        expanded_student_modal,
         html.Div([
             html.Div(input_group, className='d-flex me-2'),
             html.Div(loading_component, className='d-flex')
         ], className='d-flex sticky-top pb-1 bg-light'),
         lodrc.LOPanelLayout(
             html.Div(id=_output, className='d-flex justify-content-between flex-wrap'),
-            panels=[
-                {'children': expanded_student_component,
-                 'width': '30%', 'id': _expanded_student_panel,
-                 'side': 'right'}
-            ],
+            panels=[],
             id=_panels_layout, shown=[]
         ),
     ])
@@ -175,7 +180,6 @@ def layout():
 
 
 # Send the initial state based on the url hash to LO.
-# Reads the pre-computed hash via State so we don't recompute.
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='sendToLOConnection'),
     Output(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'send'),
@@ -186,9 +190,7 @@ clientside_callback(
     State(_options_text_information, 'data')
 )
 
-# When the applied options store changes (initial load or Run click),
-# compute and store the hash. This is the ONLY callback that writes
-# to _applied_option_hash.
+# When the applied options store changes, compute and store the hash.
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='computeAppliedHash'),
     Output(_applied_option_hash, 'data'),
@@ -196,8 +198,6 @@ clientside_callback(
 )
 
 # When Run is clicked, apply staged options and close modal.
-# This writes to _options_text_information which then triggers
-# computeAppliedHash above.
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='applyOptionsAndCloseModal'),
     Output(_options_text_information, 'data'),
@@ -254,25 +254,17 @@ clientside_callback(
     State({'type': 'WOStudentTextTile', 'index': ALL}, 'id'),
 )
 
-# Expand a single student
+# Expand a single student into the modal
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='expandCurrentStudent'),
+    Output(_expanded_student_title, 'children'),
     Output(_expanded_student_child, 'children'),
-    Output(_panels_layout, 'shown', allow_duplicate=True),
+    Output(_expanded_student_modal, 'is_open'),
     Input({'type': 'WOStudentTileExpand', 'index': ALL}, 'n_clicks'),
     Input({'type': 'WOStudentTile', 'index': ALL}, 'children'),
     State({'type': 'WOStudentTile', 'index': ALL}, 'id'),
-    State(_panels_layout, 'shown'),
+    State(_expanded_student_modal, 'is_open'),
     State(_expanded_student_child, 'children'),
-    prevent_initial_call=True
-)
-
-# Close expanded student
-clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='closeExpandedStudent'),
-    Output(_panels_layout, 'shown', allow_duplicate=True),
-    Input(_expanded_student_close, 'n_clicks'),
-    State(_panels_layout, 'shown'),
     prevent_initial_call=True
 )
 
@@ -285,7 +277,7 @@ clientside_callback(
     Input(lodrc.LOConnectionAIO.ids.error_store(_websocket), 'data')
 )
 
-# Save options as preset (uses staged value)
+# Save options as preset
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='addPreset'),
     Output(wo_classroom_text_highlighter.preset_component._store, 'data'),
@@ -314,7 +306,7 @@ clientside_callback(
     Input(_applied_option_hash, 'data')
 )
 
-# Update legend (reads from applied store)
+# Update legend
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateLegend'),
     Output(_legend_children, 'children'),

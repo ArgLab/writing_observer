@@ -30,12 +30,9 @@ const checkForResponse = function (s, promptHash, options) {
   if (!student) { return false; }
   return options.every(option => {
     const hashKey = `option_hash_${option}`;
-    // For hash-dependent queries, check the hash matches
     if (hashKey in student) {
       return promptHash === student[hashKey];
     }
-    // For hash-independent queries (time_on_task, activity),
-    // just check the data key exists
     return option in student;
   });
 };
@@ -125,29 +122,16 @@ function createProcessTags (document, metrics) {
   return createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children, className: 'sticky-top' });
 }
 
-/**
- * Check if a student has fully responded for a given hash.
- * Inspects each document for the expected hash keys.
- *
- * For hash-dependent queries (like docs_with_nlp_annotations),
- * we check `option_hash_<query>` matches the applied hash.
- *
- * For hash-independent queries (like time_on_task, activity),
- * we just check the key exists on the document.
- */
 function studentHasResponded (student, appliedHash) {
   const documents = student.documents || {};
   const docKeys = Object.keys(documents);
 
-  // If the student has no documents at all, they haven't responded
   if (docKeys.length === 0) { return false; }
 
-  // Check every document the student has
   for (const docKey of docKeys) {
     const doc = documents[docKey];
     if (!doc) { return false; }
 
-    // The NLP annotation hash must match the applied hash
     const docHash = doc.option_hash_docs_with_nlp_annotations;
     if (docHash !== appliedHash) {
       return false;
@@ -159,10 +143,6 @@ function studentHasResponded (student, appliedHash) {
 const ClassroomTextHighlightLoadingQueries = ['docs_with_nlp_annotations', 'time_on_task', 'activity'];
 
 window.dash_clientside.wo_classroom_text_highlighter = {
-  /**
-   * Compute the hash whenever the applied options change.
-   * This is the SINGLE source of truth for the hash.
-   */
   computeAppliedHash: async function (appliedValue) {
     if (!appliedValue) { return ''; }
     const h = await hashObject(appliedValue);
@@ -170,11 +150,6 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return h;
   },
 
-  /**
-   * Send updated queries to the communication protocol.
-   * Now triggered by the hash changing (Input) and reads
-   * the options value from State.
-   */
   sendToLOConnection: function (wsReadyState, urlHash, docKwargs, appliedHash, nlpValue) {
     if (wsReadyState === undefined) {
       return window.dash_clientside.no_update;
@@ -212,11 +187,6 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return !isOpen;
   },
 
-  /**
-   * Apply staged options and close modal.
-   * Only writes to _options_text_information — the hash
-   * is computed by the separate computeAppliedHash callback.
-   */
   applyOptionsAndCloseModal: function (clicks, stagedValue) {
     if (!clicks) {
       return [window.dash_clientside.no_update, window.dash_clientside.no_update];
@@ -333,17 +303,6 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return data[preset];
   },
 
-  /**
-   * Update the loading bar.
-   *
-   * We use two independent approaches to determine if a student
-   * has responded:
-   * 1. The original checkForResponse (if available)
-   * 2. Our own direct hash check on document data
-   *
-   * We use whichever is more conservative (fewer students counted
-   * as responded) to ensure the loading bar stays visible.
-   */
   updateLoadingInformation: function (wsStorageData, appliedHash) {
     const noLoading = [false, 0, ''];
 
@@ -378,29 +337,53 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return [true, loadingProgress, outputText];
   },
 
-  expandCurrentStudent: function (clicks, children, ids, shownPanels, currentChild) {
+  /**
+   * Expand a student into the detail modal.
+   *
+   * Returns [modalTitle, modalBodyChild, isOpen].
+   *
+   * We extract the student's display name for the modal title
+   * and only the inner content (process tags + annotated text)
+   * for the body — avoiding the tile chrome (expand button,
+   * profile header, etc.).
+   */
+  expandCurrentStudent: function (clicks, children, ids, isModalOpen, currentChild) {
     const triggeredItem = window.dash_clientside.callback_context?.triggered_id ?? null;
     if (!triggeredItem) { return window.dash_clientside.no_update; }
-    let child = '';
+
     let id = null;
+
     if (triggeredItem?.type === 'WOStudentTile') {
-      if (!currentChild) { return window.dash_clientside.no_update; }
-      id = currentChild?.props.id.index;
+      // Tile content updated while modal is already open — refresh it
+      if (!isModalOpen || !currentChild) {
+        return window.dash_clientside.no_update;
+      }
+      id = currentChild?.props?.id?.index;
     } else if (triggeredItem?.type === 'WOStudentTileExpand') {
       id = triggeredItem?.index;
-      shownPanels = shownPanels.concat('wo-classroom-text-highlighter-expanded-student-panel');
     } else {
       return window.dash_clientside.no_update;
     }
-    const index = ids.findIndex(item => item.index === id);
-    child = children[index][0];
-    return [child, shownPanels];
-  },
 
-  closeExpandedStudent: function (clicks, shown) {
-    if (!clicks) { return window.dash_clientside.no_update; }
-    shown = shown.filter(item => item !== 'wo-classroom-text-highlighter-expanded-student-panel');
-    return shown;
+    const index = ids.findIndex(item => item.index === id);
+    if (index === -1) { return window.dash_clientside.no_update; }
+
+    // children[index] is the wrapper div's children array.
+    // children[index][0] is the WOStudentTextTile component.
+    const tile = children[index][0];
+    const tileProps = tile?.props || {};
+
+    // Build a readable student name from the profile
+    const profile = tileProps.profile || {};
+    const studentName = [profile.name_given, profile.name_family]
+      .filter(Boolean)
+      .join(' ') || 'Student';
+
+    // The actual content lives inside childComponent (metrics + annotated text).
+    // This avoids pulling in the expand button, profile header, etc.
+    const innerContent = tileProps.childComponent || '';
+
+    return [studentName, innerContent, true];
   },
 
   updateLegend: function (value, options) {
