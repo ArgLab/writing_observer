@@ -231,14 +231,16 @@ def clean_assignment_docs(google_json):
     Retrieve set of documents per student associated with an assignment
     '''
     student_submissions = google_json.get('studentSubmissions', [])
+    cleaned_submissions = []
     for student_json in student_submissions:
         google_id = student_json[constants.USER_ID]
         local_id = learning_observer.auth.google_id_to_user_id(google_id)
-        student_json[constants.USER_ID] = local_id
         docs = [d['driveFile'] for d in learning_observer.util.get_nested_dict_value(student_json, 'assignmentSubmission.attachments', []) if 'driveFile' in d]
-        student_json['documents'] = docs
-        # TODO we should probably remove some of the keys provided
-    return student_submissions
+        cleaned_submissions.append({
+            constants.USER_ID: local_id,
+            'documents': docs
+        })
+    return cleaned_submissions
 
 
 if __name__ == '__main__':

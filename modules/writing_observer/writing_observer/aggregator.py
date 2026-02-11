@@ -12,6 +12,7 @@ import learning_observer.cache
 import learning_observer.communication_protocol.integration
 import learning_observer.constants as constants
 import learning_observer.kvs
+import learning_observer.rosters
 import learning_observer.settings
 from learning_observer.stream_analytics.fields import KeyField, KeyStateType, EventField
 import learning_observer.stream_analytics.helpers
@@ -278,11 +279,11 @@ async def update_reconstruct_reducer_with_google_api(runtime, doc_ids):
         """
         if student is None or doc_id is None or len(doc_id) == 0:
             return None
-        import learning_observer.google
+        import learning_observer.integrations.google
 
         kvs = learning_observer.kvs.KVS()
 
-        text = await learning_observer.google.doctext(runtime, documentId=doc_id)
+        text = await learning_observer.integrations.google.doctext(runtime, documentId=doc_id)
         # Only update Redis is we have text available. If `text` is missing, then
         # we likely encountered an error, usually related to document permissions.
         if 'text' not in text:
@@ -332,13 +333,13 @@ async def update_reconstruct_data_with_google_api(runtime, student_data):
         :param student: A student object
         :return: The text of the latest document
         """
-        import learning_observer.google
+        import learning_observer.integrations.google
 
         kvs = learning_observer.kvs.KVS()
 
         docId = get_last_document_id(student)
         # fetch text
-        text = await learning_observer.google.doctext(runtime, documentId=docId)
+        text = await learning_observer.integrations.google.doctext(runtime, documentId=docId)
         # set reconstruction data to ground truth
         key = learning_observer.stream_analytics.helpers.make_key(
             writing_observer.writing_analysis.reconstruct,
@@ -427,7 +428,7 @@ async def fetch_assignment_docs(runtime, course_id, kwargs=None):
     assignment_id = kwargs.get('assignment')
     output = []
     if assignment_id:
-        output = await learning_observer.google.assigned_docs(runtime, courseId=course_id, courseWorkId=assignment_id)
+        output = await learning_observer.rosters.courseassignment_assigned_docs(runtime.get_request(), course_id, assignment_id)
     async for student in learning_observer.util.ensure_async_generator(output):
         s = {}
         s['doc_id'] = student['documents'][0]['id']

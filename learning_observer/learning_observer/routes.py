@@ -73,8 +73,14 @@ def add_routes(app):
             '/webapi/courselist/',
             rosters.courselist_api),
         aiohttp.web.get(
+            '/webapi/course/{course_id}',
+            rosters.course_api),
+        aiohttp.web.get(
             '/webapi/courseroster/{course_id}',
             rosters.courseroster_api),
+        aiohttp.web.get(
+            '/webapi/courseassignments/{course_id}',
+            rosters.courseassignments_api),
     ])
 
     register_auth_webapp_views(app)

@@ -44,6 +44,7 @@ _options_text_information_staged = f'{_options_text_information}-staged'
 
 # Store that holds the hash of the currently applied options.
 _applied_option_hash = f'{_options_prefix}-applied-hash'
+_applied_doc_src = f'{_options_prefix}-applied-doc-src'
 
 # ── Walkthrough DOM IDs ────────────────────────────────────────────────
 _walkthrough_prefix = f'{_prefix}-walkthrough'
@@ -142,7 +143,7 @@ options_modal = dbc.Modal([
             dbc.CardHeader('Highlights & Metrics'),
             dbc.CardBody([
                 html.P(
-                    'Select which AI analyses to apply to student writing. '
+                    'Select which analyses to apply to student writing. '
                     'Highlights add color-coded annotations to the text; '
                     'metrics add summary badges to each student tile.',
                     className='text-muted small mb-3',
@@ -179,6 +180,10 @@ applied_options_store = dcc.Store(
 applied_option_hash_store = dcc.Store(
     id=_applied_option_hash,
     data=''
+)
+applied_doc_src_store = dcc.Store(
+    id=_applied_doc_src,
+    data={}
 )
 
 # Legend
@@ -254,8 +259,9 @@ def layout():
         alert_component,
         applied_options_store,
         applied_option_hash_store,
+        applied_doc_src_store,
         walkthrough_store,
-        walkthrough_seen_store,       # <-- ADD THIS
+        walkthrough_seen_store,
         walkthrough_modal,
         options_modal,
         expanded_student_modal,
@@ -319,7 +325,7 @@ clientside_callback(
     Output(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'send'),
     Input(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'state'),
     Input('_pages_location', 'hash'),
-    Input(lodrc.LODocumentSourceSelectorAIO.ids.kwargs_store(_options_doc_src), 'data'),
+    Input(_applied_doc_src, 'data'),
     Input(_applied_option_hash, 'data'),
     State(_options_text_information, 'data')
 )
@@ -331,13 +337,15 @@ clientside_callback(
     Input(_options_text_information, 'data'),
 )
 
-# When Run is clicked, apply staged options and close modal.
+# When Run is clicked, apply staged options, snapshot doc source, and close modal.
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='applyOptionsAndCloseModal'),
     Output(_options_text_information, 'data'),
+    Output(_applied_doc_src, 'data'),
     Output(_options_modal, 'is_open', allow_duplicate=True),
     Input(_options_run, 'n_clicks'),
     State(_options_text_information_staged, 'value'),
+    State(lodrc.LODocumentSourceSelectorAIO.ids.kwargs_store(_options_doc_src), 'data'),
     prevent_initial_call=True
 )
 

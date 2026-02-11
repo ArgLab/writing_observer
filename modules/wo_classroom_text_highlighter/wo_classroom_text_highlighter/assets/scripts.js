@@ -365,6 +365,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       decodedParams.option_hash = appliedHash;
       decodedParams.doc_source = docKwargs.src;
       decodedParams.doc_source_kwargs = docKwargs.kwargs;
+      decodedParams.rerun_dag_delay = 120;
       const outgoingMessage = {
         wo_classroom_text_highlighter_query: {
           execution_dag: 'writing_observer',
@@ -383,12 +384,16 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return !isOpen;
   },
 
-  applyOptionsAndCloseModal: function (clicks, stagedValue) {
+  applyOptionsAndCloseModal: function (clicks, stagedValue, docKwargs) {
     if (!clicks) {
-      return [window.dash_clientside.no_update, window.dash_clientside.no_update];
+      return [
+        window.dash_clientside.no_update,
+        window.dash_clientside.no_update,
+        window.dash_clientside.no_update
+      ];
     }
-    console.log('[applyOptionsAndCloseModal] Applying staged options');
-    return [stagedValue, false];
+    console.log('[applyOptionsAndCloseModal] Applying staged options and doc source');
+    return [stagedValue, docKwargs, false];
   },
 
   adjustTileSize: function (width, height, studentIds) {
