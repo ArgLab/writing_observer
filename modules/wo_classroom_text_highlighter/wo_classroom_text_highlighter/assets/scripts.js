@@ -434,6 +434,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
 
     for (const student in students) {
       const selectedDocument = students[student].doc_id || Object.keys(students[student].documents || {})[0] || '';
+      const documentTitle = students[student]?.availableDocuments?.[selectedDocument]?.title ?? selectedDocument ?? '';
       const studentTileChild = createDashComponent(
         DASH_HTML_COMPONENTS, 'Div',
         {
@@ -452,6 +453,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
           showName,
           profile: students[student].documents[selectedDocument]?.profile || {},
           selectedDocument,
+          documentTitle,
           childComponent: studentTileChild,
           id: { type: 'WOStudentTextTile', index: student },
           currentStudentHash: students[student].documents[selectedDocument]?.option_hash_docs_with_nlp_annotations,
@@ -543,37 +545,123 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     return [true, loadingProgress, outputText];
   },
 
-  expandCurrentStudent: function (clicks, children, ids, isModalOpen, currentChild) {
+  /**
+   * When a student tile expand button is clicked, record which student
+   * was selected and open the modal.
+   *
+   * Returns [selectedStudentId, isModalOpen, showIdentity].
+   */
+  expandCurrentStudent: function (clicks, ids, isModalOpen, currentStudentId, globalShowName) {
     const triggeredItem = window.dash_clientside.callback_context?.triggered_id ?? null;
     if (!triggeredItem) { return window.dash_clientside.no_update; }
 
-    let id = null;
-
-    if (triggeredItem?.type === 'WOStudentTile') {
-      if (!isModalOpen || !currentChild) {
-        return window.dash_clientside.no_update;
-      }
-      id = currentChild?.props?.id?.index;
-    } else if (triggeredItem?.type === 'WOStudentTileExpand') {
-      id = triggeredItem?.index;
-    } else {
+    // Only act on actual expand button clicks
+    if (triggeredItem?.type !== 'WOStudentTileExpand') {
       return window.dash_clientside.no_update;
     }
 
+    // Make sure something was actually clicked (not just initial callback fire)
+    const hasActualClick = clicks && clicks.some(c => c !== undefined && c !== null && c > 0);
+    if (!hasActualClick) { return window.dash_clientside.no_update; }
+
+    const id = triggeredItem?.index;
     const index = ids.findIndex(item => item.index === id);
     if (index === -1) { return window.dash_clientside.no_update; }
 
-    const tile = children[index][0];
-    const tileProps = tile?.props || {};
+    const showIdentity = globalShowName !== undefined ? globalShowName : true;
 
-    const profile = tileProps.profile || {};
-    const studentName = [profile.name_given, profile.name_family]
+    return [id, true, showIdentity];
+  },
+
+  /**
+   * Reactively render the expanded student modal content from live
+   * websocket data. Only builds content when the modal is actually open
+   * and a student is selected.
+   *
+   * Returns [studentName, docTitle, childContent].
+   */
+  renderExpandedStudent: function (wsStorageData, selectedStudentId, isModalOpen, value, options, optionHash) {
+    // Don't do anything if the modal isn't open
+    if (!isModalOpen) {
+      return window.dash_clientside.no_update;
+    }
+
+    if (!selectedStudentId || !wsStorageData?.students) {
+      return [
+        '',
+        '',
+        createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+          children: 'No student selected.',
+          className: 'text-muted text-center py-5'
+        })
+      ];
+    }
+
+    const student = wsStorageData.students[selectedStudentId];
+    if (!student) {
+      return [
+        'Student',
+        '',
+        createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+          children: 'Student data not available.',
+          className: 'text-muted text-center py-5'
+        })
+      ];
+    }
+
+    const selectedDocument = student.doc_id || Object.keys(student.documents || {})[0] || '';
+    const documentName = student?.availableDocuments?.[selectedDocument]?.title ?? selectedDocument ?? '';
+    const doc = student.documents?.[selectedDocument];
+
+    if (!doc) {
+      return [
+        'Student',
+        documentName,
+        createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+          children: 'Document data not available yet.',
+          className: 'text-muted text-center py-5'
+        })
+      ];
+    }
+
+    const names = doc.profile?.name || {};
+    const studentName = [names.given_name, names.family_name]
       .filter(Boolean)
       .join(' ') || 'Student';
 
-    const innerContent = tileProps.childComponent || '';
+    const selectedHighlights = fetchSelectedItemsFromOptions(value, options, 'highlight');
+    const selectedMetrics = fetchSelectedItemsFromOptions(value, options, 'metric');
 
-    return [studentName, innerContent, true];
+    const childContent = createDashComponent(
+      DASH_HTML_COMPONENTS, 'Div',
+      {
+        children: [
+          createProcessTags({ ...doc }, selectedMetrics),
+          createDashComponent(
+            LO_DASH_REACT_COMPONENTS, 'WOAnnotatedText',
+            formatStudentData({ ...doc }, selectedHighlights)
+          )
+        ]
+      }
+    );
+
+    return [studentName, documentName, childContent];
+  },
+
+  toggleExpandedStudentIdentity: function (clicks, currentValue) {
+    if (!clicks) { return window.dash_clientside.no_update; }
+    return !currentValue;
+  },
+
+  renderExpandedStudentIdentity: function (showIdentity) {
+    const visible = { };
+    const hidden = { display: 'none' };
+
+    const titleStyle = showIdentity ? visible : hidden;
+    const docTitleStyle = showIdentity ? visible : hidden;
+    const iconClass = showIdentity ? 'fas fa-eye' : 'fas fa-eye-slash';
+
+    return [titleStyle, docTitleStyle, iconClass];
   },
 
   updateLegend: function (value, options) {

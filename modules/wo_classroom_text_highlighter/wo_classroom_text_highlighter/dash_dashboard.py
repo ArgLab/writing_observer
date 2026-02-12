@@ -196,13 +196,36 @@ _expanded_student = f'{_prefix}-expanded-student'
 _expanded_student_modal = f'{_expanded_student}-modal'
 _expanded_student_title = f'{_expanded_student}-title'
 _expanded_student_child = f'{_expanded_student}-child'
+_expanded_student_show_identity = f'{_expanded_student}-show-identity'
+_expanded_student_show_identity_toggle = f'{_expanded_student}-show-identity-toggle'
+_expanded_student_doc_title = f'{_expanded_student}-doc-title'
+_expanded_student_id = f'{_expanded_student}-id'
+
+expanded_student_id_store = dcc.Store(
+    id=_expanded_student_id,
+    data=None
+)
 
 expanded_student_modal = dbc.Modal(
     [
-        dbc.ModalHeader(
-            dbc.ModalTitle('Student', id=_expanded_student_title),
-            close_button=True,
-        ),
+        dbc.ModalHeader([
+            dbc.ModalTitle([
+                html.Div(id=_expanded_student_title),
+                html.Small(
+                    id=_expanded_student_doc_title,
+                    className='text-muted ms-2',
+                    style={'fontSize': '0.75em'}
+                ),
+            ], className='d-flex align-items-baseline'),
+            dbc.Button(
+                html.I(className='fas fa-eye', id=f'{_expanded_student_show_identity_toggle}-icon'),
+                id=_expanded_student_show_identity_toggle,
+                color='link',
+                size='sm',
+                className='ms-2 text-secondary',
+                title='Show/hide student name and document title',
+            ),
+        ], close_button=True, className='d-flex align-items-center'),
         dbc.ModalBody(
             html.Div(id=_expanded_student_child),
             style={'overflowY': 'auto'},
@@ -213,6 +236,12 @@ expanded_student_modal = dbc.Modal(
     size='xl',
     centered=True,
     scrollable=True,
+)
+
+# Store for the modal-local identity visibility
+expanded_student_show_identity_store = dcc.Store(
+    id=_expanded_student_show_identity,
+    data=True
 )
 
 # Alert Component
@@ -260,6 +289,8 @@ def layout():
         applied_options_store,
         applied_option_hash_store,
         applied_doc_src_store,
+        expanded_student_show_identity_store,
+        expanded_student_id_store,
         walkthrough_store,
         walkthrough_seen_store,
         walkthrough_modal,
@@ -396,18 +427,50 @@ clientside_callback(
     State({'type': 'WOStudentTextTile', 'index': ALL}, 'id'),
 )
 
-# Expand a single student into the modal
+# ── Expand: record which student was clicked, open modal ──────────────
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='expandCurrentStudent'),
-    Output(_expanded_student_title, 'children'),
-    Output(_expanded_student_child, 'children'),
+    Output(_expanded_student_id, 'data'),
     Output(_expanded_student_modal, 'is_open'),
+    Output(_expanded_student_show_identity, 'data'),
     Input({'type': 'WOStudentTileExpand', 'index': ALL}, 'n_clicks'),
-    Input({'type': 'WOStudentTile', 'index': ALL}, 'children'),
     State({'type': 'WOStudentTile', 'index': ALL}, 'id'),
     State(_expanded_student_modal, 'is_open'),
-    State(_expanded_student_child, 'children'),
+    State(_expanded_student_id, 'data'),
+    State(_options_hide_header, 'value'),
     prevent_initial_call=True
+)
+
+# ── Expand: reactively render content from live websocket data ────────
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='renderExpandedStudent'),
+    Output(_expanded_student_title, 'children'),
+    Output(_expanded_student_doc_title, 'children'),
+    Output(_expanded_student_child, 'children'),
+    Input(lodrc.LOConnectionAIO.ids.ws_store(_websocket), 'data'),
+    Input(_expanded_student_id, 'data'),
+    State(_expanded_student_modal, 'is_open'),
+    State(_options_text_information, 'data'),
+    State(_options_text_information_staged, 'options'),
+    State(_applied_option_hash, 'data'),
+)
+
+# Toggle identity visibility within the expanded modal
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='toggleExpandedStudentIdentity'),
+    Output(_expanded_student_show_identity, 'data', allow_duplicate=True),
+    Input(_expanded_student_show_identity_toggle, 'n_clicks'),
+    State(_expanded_student_show_identity, 'data'),
+    prevent_initial_call=True
+)
+
+# Render identity visibility in the expanded modal (hide/show name, doc title, icon)
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='renderExpandedStudentIdentity'),
+    Output(_expanded_student_title, 'style'),
+    Output(_expanded_student_doc_title, 'style'),
+    Output(f'{_expanded_student_show_identity_toggle}-icon', 'className'),
+    Input(_expanded_student_show_identity, 'data'),
 )
 
 # Update the alert component with any errors
