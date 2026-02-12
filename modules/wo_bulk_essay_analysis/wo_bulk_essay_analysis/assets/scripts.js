@@ -8,16 +8,84 @@ if (!window.dash_clientside) {
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/3rd_party/pdf.worker.min.js';
 
-const createStudentCard = async function (s, prompt, width, height, showName, selectedMetrics) {
-  const selectedDocument = s.doc_id || Object.keys(s.documents || {})[0] || '';
-  const student = s.documents?.[selectedDocument] ?? {};
-  const promptHash = await hashObject({ prompt });
+// const DASH_HTML_COMPONENTS = 'dash_html_components';
+// const DASH_CORE_COMPONENTS = 'dash_core_components';
+// const DASH_BOOTSTRAP_COMPONENTS = 'dash_bootstrap_components';
+// const LO_DASH_REACT_COMPONENTS = 'lo_dash_react_components';
 
-  const studentText = {
-    namespace: 'lo_dash_react_components',
-    type: 'WOAnnotatedText',
-    props: { text: student.text, breakpoints: [] }
-  };
+// function createDashComponent (namespace, type, props) {
+//   return { namespace, type, props };
+// }
+
+function fetchSelectedItemsFromOptions (value, options, type) {
+  return options.reduce(function (filtered, option) {
+    if (value?.[option.id]?.[type]?.value) {
+      const selected = { ...option, ...value[option.id] };
+      filtered.push(selected);
+    }
+    return filtered;
+  }, []);
+}
+
+function createProcessTags (document, metrics) {
+  const children = metrics.map(metric => {
+    switch (metric.id) {
+      case 'time_on_task':
+        return createDashComponent(
+          DASH_BOOTSTRAP_COMPONENTS, 'Badge',
+          { children: `${rendertime2(document[metric.id])} on task`, className: 'me-1' }
+        );
+      case 'status':
+        const color = document[metric.id] === 'active' ? 'success' : 'warning';
+        return createDashComponent(
+          DASH_BOOTSTRAP_COMPONENTS, 'Badge',
+          { children: document[metric.id], color }
+        );
+      default:
+        break;
+    }
+  });
+  return createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children, className: 'sticky-top' });
+}
+
+async function hashObject (obj) {
+  const jsonString = JSON.stringify(obj);
+  const encoder = new TextEncoder();
+  const data = encoder.encode(jsonString);
+
+  if (crypto && crypto.subtle) {
+    try {
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+    } catch (error) {
+      console.warn('crypto.subtle.digest failed; falling back to simple hash.');
+    }
+  }
+
+  return simpleHash(jsonString);
+}
+
+function simpleHash (str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return hash.toString(16);
+}
+
+const createStudentCard = function (s, promptHash, width, height, showName, selectedMetrics) {
+  const selectedDocument = s.doc_id || Object.keys(s.documents || {})[0] || '';
+  const documentTitle = s?.availableDocuments?.[selectedDocument]?.title ?? selectedDocument ?? '';
+  const student = s.documents?.[selectedDocument] ?? {};
+
+  const studentText = createDashComponent(
+    LO_DASH_REACT_COMPONENTS, 'WOAnnotatedText',
+    { text: student.text, breakpoints: [] }
+  );
   const studentTileChild = createDashComponent(
     DASH_HTML_COMPONENTS, 'Div',
     {
@@ -27,48 +95,40 @@ const createStudentCard = async function (s, prompt, width, height, showName, se
       ]
     }
   );
-  const errorMessage = {
-    namespace: 'dash_html_components',
-    type: 'Div',
-    props: {
-      children: 'An error occurred while processing the text.'
-    }
-  };
-  const feedbackMessage = {
-    namespace: DASH_CORE_COMPONENTS,
-    type: 'Markdown',
-    props: {
+  const errorMessage = createDashComponent(
+    DASH_HTML_COMPONENTS, 'Div',
+    { children: 'An error occurred while processing the text.' }
+  );
+  const feedbackMessage = createDashComponent(
+    DASH_CORE_COMPONENTS, 'Markdown',
+    {
       children: student?.feedback ? student.feedback : '',
       className: student?.feedback ? 'p-1 overflow-auto' : '',
       style: { whiteSpace: 'pre-line' }
     }
-  };
-  const feedbackLoading = {
-    namespace: 'dash_html_components',
-    type: 'Div',
-    props: {
-      children: [{
-        namespace: 'dash_bootstrap_components',
-        type: 'Spinner',
-        props: {}
-      }, {
-        namespace: 'dash_html_components',
-        type: 'Div',
-        props: { children: 'Waiting for a response.' }
-      }],
+  );
+  const feedbackLoading = createDashComponent(
+    DASH_HTML_COMPONENTS, 'Div',
+    {
+      children: [
+        createDashComponent(DASH_BOOTSTRAP_COMPONENTS, 'Spinner', {}),
+        createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children: 'Waiting for a response.' })
+      ],
       className: 'text-center'
     }
-  };
+  );
   const feedback = promptHash === student.option_hash_gpt_bulk ? feedbackMessage : feedbackLoading;
   const feedbackOrError = 'error' in student ? errorMessage : feedback;
   const userId = student?.user_id;
-  if (!userId) { return {}; }
+  if (!userId) { return null; }
+
   const studentTile = createDashComponent(
     LO_DASH_REACT_COMPONENTS, 'WOStudentTextTile',
     {
       showName,
       profile: student?.profile || {},
       selectedDocument,
+      documentTitle,
       childComponent: studentTileChild,
       id: { type: 'WOAIAssistStudentTileText', index: userId },
       currentOptionHash: promptHash,
@@ -102,17 +162,18 @@ const createStudentCard = async function (s, prompt, width, height, showName, se
   return tileWrapper;
 };
 
-/**
- * Check for if we should trigger loading on a student or not.
- * @param {*} s student
- * @param {*} promptHash current hash of prompts
- * @returns true if student's selected document's hash is the same as promptHash
- */
-const checkForResponse = function (s, promptHash, options) {
+const checkForBulkResponse = function (s, promptHash, options) {
   if (!('documents' in s)) { return false; }
   const selectedDocument = s.doc_id || Object.keys(s.documents || {})[0] || '';
   const student = s.documents[selectedDocument];
-  return options.every(option => promptHash === student[`option_hash_${option}`]);
+  if (!student) { return false; }
+  return options.every(option => {
+    const hashKey = `option_hash_${option}`;
+    if (hashKey in student) {
+      return promptHash === student[hashKey];
+    }
+    return option in student;
+  });
 };
 
 const charactersAfterChar = function (str, char) {
@@ -126,27 +187,19 @@ const charactersAfterChar = function (str, char) {
 // Helper functions for extracting text from files
 const extractPDF = async function (base64String) {
   const pdfData = atob(charactersAfterChar(base64String, ','));
-
-  // Use PDF.js to load and parse the PDF
   const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-
   const totalPages = pdf.numPages;
   const allTextPromises = [];
-
   for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
     const pageTextPromise = pdf.getPage(pageNumber).then(function (page) {
       return page.getTextContent();
     }).then(function (textContent) {
       return textContent.items.map(item => item.str).join(' ');
     });
-
     allTextPromises.push(pageTextPromise);
   }
-
   const allTexts = await Promise.all(allTextPromises);
-  const allText = allTexts.join('\n');
-
-  return allText;
+  return allTexts.join('\n');
 };
 
 const extractTXT = async function (base64String) {
@@ -160,7 +213,7 @@ const extractMD = async function (base64String) {
 const extractDOCX = async function (base64String) {
   const arrayBuffer = Uint8Array.from(atob(charactersAfterChar(base64String, ',')), c => c.charCodeAt(0)).buffer;
   const result = await mammoth.extractRawText({ arrayBuffer });
-  return result.value; // The raw text
+  return result.value;
 };
 
 const fileTextExtractors = {
@@ -172,11 +225,397 @@ const fileTextExtractors = {
 
 const AIAssistantLoadingQueries = ['gpt_bulk', 'time_on_task', 'activity'];
 
+// ── Walkthrough step definitions ──────────────────────────────────────
+const BULK_WALKTHROUGH_STEPS = [
+  {
+    title: 'Welcome to the Classroom AI Feedback Assistant!',
+    icon: 'fas fa-robot',
+    body: [
+      'This dashboard lets you send every student\'s writing to an AI assistant ',
+      'and view the feedback side-by-side with their original text.',
+      '\n\n',
+      'Let\'s walk through how to get started — it only takes a minute.'
+    ].join('')
+  },
+  {
+    title: 'Step 1 — Write Your Prompt',
+    icon: 'fas fa-pen-fancy',
+    body: [
+      'In the Prompt Input panel you\'ll see a text area for your query. ',
+      'This is what the AI will do with each student\'s writing.\n\n',
+      'Use placeholders like {student_text} to reference student essays. ',
+      'You can also add custom placeholders (e.g. a rubric) via the ',
+      '"Add" button next to the placeholder word bank.\n\n',
+      'There\'s also a system prompt that guides the AI\'s overall behavior — ',
+      'you can edit it in Settings (⚙).'
+    ].join('')
+  },
+  {
+    title: 'Step 2 — Click Submit',
+    icon: 'fas fa-paper-plane',
+    body: [
+      'Once your prompt is ready, click the "Submit" button.\n\n',
+      'The dashboard will send your prompt (with each student\'s text filled in) ',
+      'to the AI. A progress bar will appear while results load — this can take ',
+      'a few minutes for larger classes.'
+    ].join('')
+  },
+  {
+    title: 'Step 3 — Review AI Feedback',
+    icon: 'fas fa-comments',
+    body: [
+      'Each student tile shows their original writing on top and the AI\'s ',
+      'feedback below.\n\n',
+      '• Click the expand icon (⤢) on any tile to open a larger view.\n',
+      '• Use the Settings (⚙) button to adjust tile sizes, change the document ',
+      'source, or edit the system prompt.\n',
+      '• Your prompt history is saved so you can see what you\'ve already tried.'
+    ].join('')
+  },
+  {
+    title: 'You\'re Ready!',
+    icon: 'fas fa-check-circle',
+    body: [
+      'That\'s everything you need to get started.\n\n',
+      'You can change your prompt at any time and click "Submit" again ',
+      'to get new feedback.\n\n',
+      'To revisit this guide later, click the ',
+      'help button (?) in the toolbar.'
+    ].join('')
+  }
+];
+
+/**
+ * Build the walkthrough modal body for a given step index.
+ */
+function buildBulkWalkthroughBody (step) {
+  const info = BULK_WALKTHROUGH_STEPS[step];
+  const paragraphs = info.body.split('\n').filter(Boolean).map(line =>
+    createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+      children: line,
+      className: 'mb-2',
+      style: { whiteSpace: 'pre-wrap' }
+    })
+  );
+  return createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+    children: [
+      createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+        children: createDashComponent(DASH_HTML_COMPONENTS, 'I', {
+          className: `${info.icon} fa-3x text-primary mb-3`
+        }),
+        className: 'text-center'
+      }),
+      ...paragraphs
+    ]
+  });
+}
+
+/**
+ * Build an empty-state placeholder when no student data is loaded yet.
+ */
+function buildBulkEmptyState () {
+  return createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+    className: 'd-flex flex-column align-items-center justify-content-center text-center py-5 w-100',
+    style: { minHeight: '300px', color: '#6c757d' },
+    children: [
+      createDashComponent(DASH_HTML_COMPONENTS, 'I', {
+        className: 'fas fa-users fa-4x mb-3',
+        style: { opacity: 0.3 }
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'H4', {
+        children: 'No student data loaded yet',
+        className: 'mb-3'
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+        children: 'To get started:',
+        className: 'mb-2 fw-bold'
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+        className: 'text-start',
+        style: { maxWidth: '400px' },
+        children: [
+          createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+            className: 'mb-1',
+            children: '1. Write your prompt in the Prompt Input panel above'
+          }),
+          createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+            className: 'mb-1',
+            children: '2. Make sure {student_text} is included in your query'
+          }),
+          createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+            className: 'mb-1',
+            children: '3. Click "Submit" to send the prompt to the AI for each student'
+          })
+        ]
+      }),
+      createDashComponent(DASH_HTML_COMPONENTS, 'P', {
+        className: 'mt-3 text-muted small',
+        children: 'Click the ? button for a full walkthrough.'
+      })
+    ]
+  });
+}
+
 window.dash_clientside.bulk_essay_feedback = {
+  // ── Walkthrough callbacks ────────────────────────────────────────────
+
+  navigateWalkthrough: function (nextClicks, backClicks, doneClicks, skipClicks, helpClicks, currentStep) {
+    const triggered = window.dash_clientside.callback_context?.triggered_id;
+    if (!triggered) { return window.dash_clientside.no_update; }
+
+    const totalSteps = BULK_WALKTHROUGH_STEPS.length;
+
+    switch (triggered) {
+      case 'bulk-essay-analysis-walkthrough-next':
+        return Math.min(currentStep + 1, totalSteps - 1);
+      case 'bulk-essay-analysis-walkthrough-back':
+        return Math.max(currentStep - 1, 0);
+      case 'bulk-essay-analysis-walkthrough-done':
+      case 'bulk-essay-analysis-walkthrough-skip':
+        return -1;
+      case 'bulk-essay-analysis-help':
+        return 0;
+      default:
+        return window.dash_clientside.no_update;
+    }
+  },
+
+  renderWalkthroughStep: function (step) {
+    const totalSteps = BULK_WALKTHROUGH_STEPS.length;
+    const isOpen = step >= 0 && step < totalSteps;
+
+    if (!isOpen) {
+      return [
+        '', '', true,
+        { display: 'inline-block' },
+        { display: 'none' },
+        '',
+        false
+      ];
+    }
+
+    const info = BULK_WALKTHROUGH_STEPS[step];
+    const body = buildBulkWalkthroughBody(step);
+    const isFirst = step === 0;
+    const isLast = step === totalSteps - 1;
+    const counter = `${step + 1} of ${totalSteps}`;
+
+    return [
+      info.title,
+      body,
+      isFirst,
+      { display: isLast ? 'none' : 'inline-block' },
+      { display: isLast ? 'inline-block' : 'none' },
+      counter,
+      true
+    ];
+  },
+
+  initWalkthroughFromStorage: function (step, hasSeenWalkthrough) {
+    const triggered = window.dash_clientside.callback_context?.triggered_id;
+
+    if (!triggered) {
+      if (hasSeenWalkthrough) {
+        return [-1, true];
+      }
+      return [0, false];
+    }
+
+    if (step === -1) {
+      return [-1, true];
+    }
+
+    return [step, hasSeenWalkthrough];
+  },
+
+  // ── Settings modal callbacks ─────────────────────────────────────────
+
+  toggleSettingsModal: function (clicks, isOpen) {
+    if (!clicks) { return window.dash_clientside.no_update; }
+    return !isOpen;
+  },
+
+  applySettingsAndCloseModal: function (clicks, stagedSystemPrompt, docKwargs) {
+    if (!clicks) {
+      return [
+        window.dash_clientside.no_update,
+        window.dash_clientside.no_update,
+        window.dash_clientside.no_update
+      ];
+    }
+    console.log('[applySettingsAndCloseModal] Applying settings');
+    return [stagedSystemPrompt, docKwargs, false];
+  },
+
+  // ── Expanded student modal ───────────────────────────────────────────
+
   /**
-   * Sends data to server via websocket
+   * When a student tile expand button is clicked, record which student
+   * was selected and open the modal.
+   *
+   * Returns [selectedStudentId, isModalOpen, showIdentity].
    */
-  send_to_loconnection: async function (state, hash, clicks, docKwargs, query, systemPrompt, tags) {
+  expandCurrentStudent: function (clicks, ids, isModalOpen, currentStudentId, globalShowName) {
+    const triggeredItem = window.dash_clientside.callback_context?.triggered_id ?? null;
+    if (!triggeredItem) { return window.dash_clientside.no_update; }
+
+    // Only act on actual expand button clicks
+    if (triggeredItem?.type !== 'WOAIAssistStudentTileExpand') {
+      return window.dash_clientside.no_update;
+    }
+
+    // Make sure something was actually clicked (not just initial callback fire)
+    const hasActualClick = clicks && clicks.some(c => c !== undefined && c !== null && c > 0);
+    if (!hasActualClick) { return window.dash_clientside.no_update; }
+
+    const id = triggeredItem?.index;
+    const index = ids.findIndex(item => item.index === id);
+    if (index === -1) { return window.dash_clientside.no_update; }
+
+    const showIdentity = globalShowName !== undefined ? globalShowName : true;
+
+    return [id, true, showIdentity];
+  },
+
+  /**
+   * Reactively render the expanded student modal content from live
+   * websocket data. Only builds content when the modal is actually open
+   * and a student is selected.
+   *
+   * Returns [studentName, docTitle, childContent].
+   */
+  renderExpandedStudent: async function (wsStorageData, selectedStudentId, isModalOpen, history, value, options) {
+    // Don't do anything if the modal isn't open
+    if (!isModalOpen) {
+      return window.dash_clientside.no_update;
+    }
+
+    if (!selectedStudentId || !wsStorageData?.students) {
+      return [
+        '',
+        '',
+        createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+          children: 'No student selected.',
+          className: 'text-muted text-center py-5'
+        })
+      ];
+    }
+
+    const student = wsStorageData.students[selectedStudentId];
+    if (!student) {
+      return [
+        'Student',
+        '',
+        createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+          children: 'Student data not available.',
+          className: 'text-muted text-center py-5'
+        })
+      ];
+    }
+
+    const selectedDocument = student.doc_id || Object.keys(student.documents || {})[0] || '';
+    const documentName = student?.availableDocuments?.[selectedDocument]?.title ?? selectedDocument ?? '';
+    const doc = student.documents?.[selectedDocument];
+
+    if (!doc) {
+      return [
+        'Student',
+        documentName,
+        createDashComponent(DASH_HTML_COMPONENTS, 'Div', {
+          children: 'Document data not available yet.',
+          className: 'text-muted text-center py-5'
+        })
+      ];
+    }
+
+    const names = doc.profile?.name || {};
+    const studentName = [names.given_name, names.family_name]
+      .filter(Boolean)
+      .join(' ') || 'Student';
+
+    const selectedMetrics = fetchSelectedItemsFromOptions(value, options, 'metric');
+
+    // Compute prompt hash for feedback status
+    const currPrompt = history.length > 0 ? history[history.length - 1] : '';
+    const promptHash = await hashObject({ prompt: currPrompt });
+
+    // Build student text
+    const studentText = createDashComponent(
+      LO_DASH_REACT_COMPONENTS, 'WOAnnotatedText',
+      { text: doc.text, breakpoints: [] }
+    );
+
+    const studentTileChild = createDashComponent(
+      DASH_HTML_COMPONENTS, 'Div',
+      {
+        children: [
+          createProcessTags({ ...doc }, selectedMetrics),
+          studentText
+        ]
+      }
+    );
+
+    // Build feedback
+    const errorMessage = createDashComponent(
+      DASH_HTML_COMPONENTS, 'Div',
+      { children: 'An error occurred while processing the text.' }
+    );
+    const feedbackMessage = createDashComponent(
+      DASH_CORE_COMPONENTS, 'Markdown',
+      {
+        children: doc?.feedback ? doc.feedback : '',
+        className: doc?.feedback ? 'p-1 overflow-auto' : '',
+        style: { whiteSpace: 'pre-line' }
+      }
+    );
+    const feedbackLoading = createDashComponent(
+      DASH_HTML_COMPONENTS, 'Div',
+      {
+        children: [
+          createDashComponent(DASH_BOOTSTRAP_COMPONENTS, 'Spinner', {}),
+          createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children: 'Waiting for a response.' })
+        ],
+        className: 'text-center'
+      }
+    );
+    const feedback = promptHash === doc.option_hash_gpt_bulk ? feedbackMessage : feedbackLoading;
+    const feedbackOrError = 'error' in doc ? errorMessage : feedback;
+
+    const childContent = createDashComponent(
+      DASH_HTML_COMPONENTS, 'Div',
+      {
+        children: [
+          studentTileChild,
+          createDashComponent(
+            DASH_BOOTSTRAP_COMPONENTS, 'Card',
+            { children: feedbackOrError, body: true }
+          )
+        ]
+      }
+    );
+
+    return [studentName, documentName, childContent];
+  },
+
+  toggleExpandedStudentIdentity: function (clicks, currentValue) {
+    if (!clicks) { return window.dash_clientside.no_update; }
+    return !currentValue;
+  },
+
+  renderExpandedStudentIdentity: function (showIdentity) {
+    const visible = {};
+    const hidden = { display: 'none' };
+
+    const titleStyle = showIdentity ? visible : hidden;
+    const docTitleStyle = showIdentity ? visible : hidden;
+    const iconClass = showIdentity ? 'fas fa-eye' : 'fas fa-eye-slash';
+
+    return [titleStyle, docTitleStyle, iconClass];
+  },
+
+  // ── Core dashboard callbacks ─────────────────────────────────────────
+
+  send_to_loconnection: async function (state, hash, clicks, docKwargs, query, appliedSystemPrompt, tags) {
     if (state === undefined) {
       return window.dash_clientside.no_update;
     }
@@ -189,14 +628,12 @@ window.dash_clientside.bulk_essay_feedback = {
       decoded.message_id = '';
       decoded.doc_source = docKwargs.src;
       decoded.doc_source_kwargs = docKwargs.kwargs;
-      // TODO what is a reasonable time to wait inbetween subsequent calls for
-      // the same arguments
       decoded.rerun_dag_delay = 120;
 
       const trig = window.dash_clientside.callback_context.triggered[0];
       if (trig.prop_id.includes('bulk-essay-analysis-submit-btn')) {
         decoded.gpt_prompt = query;
-        decoded.system_prompt = systemPrompt;
+        decoded.system_prompt = appliedSystemPrompt;
         decoded.tags = tags;
       }
 
@@ -215,28 +652,6 @@ window.dash_clientside.bulk_essay_feedback = {
     return window.dash_clientside.no_update;
   },
 
-  toggleAdvanced: function (clicks, shown) {
-    if (!clicks) {
-      return window.dash_clientside.no_update;
-    }
-    const optionPrefix = 'bulk-essay-analysis-advanced-collapse';
-    if (shown.includes(optionPrefix)) {
-      shown = shown.filter(item => item !== optionPrefix);
-    } else {
-      shown = shown.concat(optionPrefix);
-    }
-    return shown;
-  },
-
-  closeAdvanced: function (clicks, shown) {
-    if (!clicks) { return window.dash_clientside.no_update; }
-    shown = shown.filter(item => item !== 'bulk-essay-analysis-advanced-collapse');
-    return shown;
-  },
-
-  /**
-   * adds submitted query to history and clear input
-   */
   update_input_history_on_query_submission: async function (clicks, query, history) {
     if (clicks > 0) {
       return history.concat(query);
@@ -244,44 +659,37 @@ window.dash_clientside.bulk_essay_feedback = {
     return window.dash_clientside.no_update;
   },
 
-  /**
-   * update history based on history browser storage
-  */
   update_history_list: function (history) {
     const items = history.map((x) => {
-      return {
-        namespace: 'dash_html_components',
-        type: 'Li',
-        props: { children: x }
-      };
+      return createDashComponent(DASH_HTML_COMPONENTS, 'Li', { children: x });
     });
-    return {
-      namespace: 'dash_html_components',
-      type: 'Ol',
-      props: { children: items }
-    };
+    return createDashComponent(DASH_HTML_COMPONENTS, 'Ol', { children: items });
   },
 
-  /**
-   * update student cards based on new data in storage
-   */
   updateStudentGridOutput: async function (wsStorageData, history, width, height, showName, value, options) {
-    if (!wsStorageData) {
-      return 'No students';
+    if (!wsStorageData?.students) {
+      return buildBulkEmptyState();
     }
+
+    const students = wsStorageData.students;
+    if (Object.keys(students).length === 0) {
+      return buildBulkEmptyState();
+    }
+
     const currPrompt = history.length > 0 ? history[history.length - 1] : '';
+    const promptHash = await hashObject({ prompt: currPrompt });
     const selectedMetrics = fetchSelectedItemsFromOptions(value, options, 'metric');
 
     let output = [];
-    for (const student in wsStorageData.students) {
-      output = output.concat(await createStudentCard(wsStorageData.students[student], currPrompt, width, height, showName, selectedMetrics));
+    for (const student in students) {
+      const card = createStudentCard(students[student], promptHash, width, height, showName, selectedMetrics);
+      if (card) {
+        output = output.concat(card);
+      }
     }
     return output;
   },
 
-  /**
-   * Uploads file content as str
-  */
   handleFileUploadToTextField: async function (contents, filename, timestamp) {
     if (filename === undefined) {
       return '';
@@ -300,9 +708,6 @@ window.dash_clientside.bulk_essay_feedback = {
     return data;
   },
 
-  /**
-   * append tag in curly braces to input
-  */
   add_tag_to_input: function (clicks, curr, store) {
     const trig = window.dash_clientside.callback_context.triggered[0];
     const trigProp = trig.prop_id;
@@ -313,14 +718,6 @@ window.dash_clientside.bulk_essay_feedback = {
     return window.dash_clientside.no_update;
   },
 
-  /**
-   * enable/disabled submit based on query
-   * makes sure there is a query and the tags are properly formatted
-   *
-   * updates the following components
-   * - submit query button disbaled status
-   * - helper text for why we disabled the submit query button
-  */
   disableQuerySubmitButton: function (query, loading, store) {
     if (query.length === 0) {
       return [true, 'Please create a request before submitting.'];
@@ -339,13 +736,6 @@ window.dash_clientside.bulk_essay_feedback = {
     return [false, ''];
   },
 
-  /**
-   * enable/disable the save attachment button if tag is already in use/blank
-   *
-   * updates the following components
-   * - save button disbaled status
-   * - helper text for why we are disabled
-   */
   disableAttachmentSaveButton: function (label, content, currentTagStore, replacementId) {
     const tags = Object.keys(currentTagStore);
     if (label.length === 0 & content.length === 0) {
@@ -360,10 +750,6 @@ window.dash_clientside.bulk_essay_feedback = {
     return [false, ''];
   },
 
-  /**
-   * Opens the tag modal when users want to add a new one or edit an
-   * existing tag.
-   */
   openTagAddModal: function (clicks, editClicks, currentTagStore, ids) {
     const triggeredItem = window.dash_clientside.callback_context?.triggered_id ?? null;
     if (!triggeredItem) { return window.dash_clientside.no_update; }
@@ -378,9 +764,6 @@ window.dash_clientside.bulk_essay_feedback = {
     return window.dash_clientside.no_update;
   },
 
-  /**
-   * populate word bank of tags
-   */
   update_tag_buttons: function (tagStore) {
     const tagLabels = Object.keys(tagStore);
     const tags = tagLabels.map((val) => {
@@ -430,12 +813,9 @@ window.dash_clientside.bulk_essay_feedback = {
     return tags;
   },
 
-  /**
-   * Save placeholder to browser storage and close edit placeholder modal
-   */
   savePlaceholder: function (clicks, label, text, replacementId, tagStore) {
     if (clicks > 0) {
-      const newStore = tagStore;
+      const newStore = { ...tagStore };
       if (!!replacementId & replacementId !== label) {
         delete newStore[replacementId];
       }
@@ -445,31 +825,19 @@ window.dash_clientside.bulk_essay_feedback = {
     return window.dash_clientside.no_update;
   },
 
-  /**
-   * Remove placeholder from store on confirm dialogue yes
-   */
   removePlaceholder: function (clicks, tagStore, ids) {
     const triggeredItem = window.dash_clientside.callback_context?.triggered_id ?? null;
     if (!triggeredItem) { return window.dash_clientside.no_update; }
     const id = triggeredItem.index;
     const index = ids.findIndex(item => item.index === id);
     if (clicks[index]) {
-      const newStore = tagStore;
+      const newStore = { ...tagStore };
       delete newStore[id];
       return newStore;
     }
     return window.dash_clientside.no_update;
   },
 
-  /**
-   * Check if we've received any errors and update
-   * the alert with the appropriate information
-   *
-   * returns an array which updates dash components
-   * - text to display on alert
-   * - show alert
-   * - JSON error data on the alert (only in debug)
-   */
   updateAlertWithError: function (error) {
     if (Object.keys(error).length === 0) {
       return ['', false, ''];
@@ -482,19 +850,19 @@ window.dash_clientside.bulk_essay_feedback = {
     return [text, true, error];
   },
 
-  /**
-   * Iterate over students and figure out if any of them have not loaded
-   * yet. We hash the last history item to compare to.
-   */
   updateLoadingInformation: async function (wsStorageData, history) {
     const noLoading = [false, 0, ''];
-    if (!wsStorageData) {
+    if (!wsStorageData?.students) {
+      return noLoading;
+    }
+    const students = wsStorageData.students;
+    const totalStudents = Object.keys(students).length;
+    if (totalStudents === 0) {
       return noLoading;
     }
     const currentPrompt = history.length > 0 ? history[history.length - 1] : '';
     const promptHash = await hashObject({ prompt: currentPrompt });
-    const returnedResponses = Object.values(wsStorageData.students).filter(student => checkForResponse(student, promptHash, AIAssistantLoadingQueries)).length;
-    const totalStudents = Object.keys(wsStorageData.students).length;
+    const returnedResponses = Object.values(students).filter(student => checkForBulkResponse(student, promptHash, AIAssistantLoadingQueries)).length;
     if (totalStudents === returnedResponses) { return noLoading; }
     const loadingProgress = returnedResponses / totalStudents + 0.1;
     const outputText = `Fetching responses from server. This will take a few minutes. (${returnedResponses}/${totalStudents} received)`;
@@ -509,117 +877,8 @@ window.dash_clientside.bulk_essay_feedback = {
     ];
   },
 
-  selectStudentForExpansion: function (clicks, shownPanels, ids) {
-    const triggeredItem = window.dash_clientside.callback_context?.triggered_id ?? null;
-    if (!triggeredItem) { return window.dash_clientside.no_update; }
-    let id = null;
-    if (triggeredItem?.type === 'WOAIAssistStudentTileExpand') {
-      id = triggeredItem?.index;
-      const index = ids.findIndex(item => item.index === id);
-      if (clicks[index]) {
-        shownPanels = shownPanels.concat('bulk-essay-analysis-expanded-student-panel');
-      } else {
-        // No clicks occurred so we should keep the ID as it was
-        id = window.dash_clientside.no_update;
-      }
-    } else {
-      return window.dash_clientside.no_update;
-    }
-    return [id, shownPanels];
-  },
-
-  expandSelectedStudent: async function (selectedStudent, wsData, showName, history, value, options) {
-    if (!selectedStudent | !(selectedStudent in (wsData.students || {}))) {
-      return window.dash_clientside.no_update;
-    }
-    const prompt = history.length > 0 ? history[history.length - 1] : '';
-    const s = wsData.students[selectedStudent];
-    const selectedDocument = s.doc_id || Object.keys(s.documents || {})[0] || '';
-    const document = Object.keys(s.documents)[0];
-    const student = s.documents[document];
-    const promptHash = await hashObject({ prompt });
-    const selectedMetrics = fetchSelectedItemsFromOptions(value, options, 'metric');
-
-    // TODO some of this can easily be abstracted
-    const studentText = {
-      namespace: 'lo_dash_react_components',
-      type: 'WOAnnotatedText',
-      props: { text: student.text, breakpoints: [] }
-    };
-    const studentTileChild = createDashComponent(
-      DASH_HTML_COMPONENTS, 'Div',
-      {
-        children: [
-          createProcessTags({ ...student }, selectedMetrics),
-          studentText
-        ]
-      }
-    );
-    const errorMessage = {
-      namespace: 'dash_html_components',
-      type: 'Div',
-      props: {
-        children: 'An error occurred while processing the text.'
-      }
-    };
-    const feedbackMessage = {
-      namespace: DASH_CORE_COMPONENTS,
-      type: 'Markdown',
-      props: {
-        children: student?.feedback ? student.feedback : '',
-        className: student?.feedback ? 'p-1' : '',
-        style: { whiteSpace: 'pre-line' }
-      }
-    };
-    const feedbackLoading = {
-      namespace: 'dash_html_components',
-      type: 'Div',
-      props: {
-        children: [{
-          namespace: 'dash_bootstrap_components',
-          type: 'Spinner',
-          props: {}
-        }, {
-          namespace: 'dash_html_components',
-          type: 'Div',
-          props: { children: 'Waiting for a response.' }
-        }],
-        className: 'text-center'
-      }
-    };
-    const feedback = promptHash === student.option_hash_gpt_bulk ? feedbackMessage : feedbackLoading;
-    const feedbackOrError = 'error' in student ? errorMessage : feedback;
-    const studentTile = createDashComponent(
-      LO_DASH_REACT_COMPONENTS, 'WOStudentTextTile',
-      {
-        showName,
-        profile: student?.profile || {},
-        selectedDocument,
-        childComponent: studentTileChild,
-        id: { type: 'WOAIAssistStudentTileText', index: student.user_id },
-        currentOptionHash: promptHash,
-        currentStudentHash: student.option_hash_gpt_bulk
-      }
-    );
-    const individualWrapper = createDashComponent(
-      DASH_HTML_COMPONENTS, 'Div',
-      {
-        className: '',
-        children: [
-          studentTile,
-          createDashComponent(
-            DASH_BOOTSTRAP_COMPONENTS, 'Card',
-            { children: feedbackOrError, body: true }
-          )
-        ]
-      }
-    );
-    return individualWrapper;
-  },
-
-  closeExpandedStudent: function (clicks, shown) {
-    if (!clicks) { return window.dash_clientside.no_update; }
-    shown = shown.filter(item => item !== 'bulk-essay-analysis-expanded-student-panel');
-    return shown;
+  showHideHeader: function (show, ids) {
+    const total = ids.length;
+    return Array(total).fill(show ? 'd-none' : '');
   }
 };
