@@ -38,7 +38,7 @@ ENDPOINTS = list(map(lambda x: util.Endpoint(**x, api_name=API), [
         # AGS results for a specific line item — lists per-student results/submissions
         # The lineItemId is typically the full line item URL or the trailing segment.
         'name': 'assignment_results',
-        'remote_url': f'{LTI_SERVICE_BASE}/services/ags/v2p0/lineitems/{{courseId}}/{{lineItemId}}/results',
+        'remote_url': f'{LTI_SERVICE_BASE}/services/ags/v2p0/lineitems/{{courseId}}/{{courseWorkId}}/results',
         'headers': {'Accept': 'application/vnd.ims.lis.v2.resultcontainer+json'}
     },
 ]))
