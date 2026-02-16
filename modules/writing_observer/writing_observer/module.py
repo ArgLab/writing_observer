@@ -113,6 +113,30 @@ EXECUTION_DAG = {
             ),
             fields={'text': 'text'}
         ),
+        "docs": q.select(
+            q.keys(
+                'writing_observer.reconstruct', 
+                STUDENTS=q.variable("roster"), 
+                STUDENTS_path='user_id', 
+                RESOURCES=q.variable("update_docs"), 
+                RESOURCES_path='doc_id'
+            ), 
+            fields={'text': 'text'}
+        ),
+        'single_student_docs_by_ids': q.select(
+            q.keys(
+                'writing_observer.reconstruct',
+                STUDENTS=q.parameter("student_id", required=True),
+                STUDENTS_path='user_id',
+                RESOURCES=q.parameter("document", required=True),
+                RESOURCES_path='doc_id'
+            ),
+            fields={'text': 'text'}
+        ),
+        'single_student_nlp': process_texts(
+            writing_data=q.variable('single_student_docs_by_ids'),
+            options=q.parameter('nlp_options', required=False, default=[])
+        ),
         "doc_ids": q.select(q.keys('writing_observer.last_document', STUDENTS=q.variable("roster"), STUDENTS_path='user_id'), fields={'document_id': 'doc_id'}),
         'update_docs': update_via_google(runtime=q.parameter("runtime"), doc_ids=q.variable('doc_sources')),
         "docs": q.select(q.keys('writing_observer.reconstruct', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("update_docs"), RESOURCES_path='doc_id'), fields={'text': 'text'}),
