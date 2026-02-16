@@ -40,3 +40,4 @@ learning_observer/learning_observer/static_data/admins.yaml
 .ipynb_checkpoints/
 .eggs/
 .next/
+modules/wo_portfolio_diff/wo_portfolio_diff/portfolio_diff/*
