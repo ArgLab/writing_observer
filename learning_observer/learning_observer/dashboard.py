@@ -953,7 +953,7 @@ async def websocket_dashboard_handler(request):
                 continue
             except (TypeError, ValueError) as e:
                 _log_protocol_event(
-                    'json_parse_error', 
+                    'json_parse_error',
                     error_type=type(e).__name__,
                     error_message=str(e)
                 )
@@ -982,18 +982,18 @@ async def websocket_dashboard_handler(request):
     # Various ways we might encounter an exception
     except asyncio.CancelledError:
         _close_connection_and_cleanup('server_cancelled')
-    except (aiohttp.web_ws.WebSocketError, 
+    except (aiohttp.web_ws.WebSocketError,
             aiohttp.client_exceptions.ClientConnectionResetError,
             ConnectionResetError) as e:
         _log_protocol_event(
-            'connection_closed_gracefully', 
-            exception_type=type(e).__name__, 
+            'connection_closed_gracefully',
+            exception_type=type(e).__name__,
             detail=str(e))
         _close_connection_and_cleanup('client_disconnected')
     except Exception as e:
         _log_protocol_event(
-            'handler_exception', 
-            exception_type=type(e).__name__, 
+            'handler_exception',
+            exception_type=type(e).__name__,
             detail=repr(e))
         _close_connection_and_cleanup('server_exception')
     finally:
@@ -1002,7 +1002,7 @@ async def websocket_dashboard_handler(request):
             t.cancel()
         if background_tasks:
             await asyncio.gather(*background_tasks, return_exceptions=True)
-        
+
         # Close WebSocket gracefully if not already closed
         if not ws.closed:
             try:
