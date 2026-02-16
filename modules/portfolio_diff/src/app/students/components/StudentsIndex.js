@@ -20,6 +20,9 @@ import {
   useLOConnectionDataManager,
   LO_CONNECTION_STATUS,
 } from "lo_event/lo_event/lo_assess/components/components.jsx";
+import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
+import { getWsOriginFromWindow } from "@/app/utils/ws";
+
 
 const SEVEN_DAYS_SECS = 7 * 24 * 60 * 60;
 
@@ -95,10 +98,11 @@ export default function WritingPortfolioDashboard() {
   const [sortKey, setSortKey] = useState("id");
   const [sortDir, setSortDir] = useState("asc");
   const [selected, setSelected] = useState(new Set());
+  const { courseId } = useCourseIdContext();
 
   // ------ LO connection setup ------
   const decoded = {};
-  decoded.course_id = "12345678901";
+  decoded.course_id = courseId;
   decoded.student_id = [{ user_id: "tc-testcase-Alberta" }];
   decoded.document = [{ doc_id: "fake-google-doc-id-1" }];
   decoded.nlp_options = ["academic_language"];
@@ -111,8 +115,13 @@ export default function WritingPortfolioDashboard() {
     },
   };
 
+  const origin =
+      process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
+      getWsOriginFromWindow() ||
+      "ws://localhost:8888";
+
   const { data, errors, connection } = useLOConnectionDataManager({
-    url: "ws://localhost:8888/wsapi/communication_protocol",
+    url: `${origin}/wsapi/communication_protocol`,
     dataScope,
   });
 

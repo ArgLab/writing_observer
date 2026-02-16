@@ -6,6 +6,8 @@ import { Loader2 } from "lucide-react";
 
 import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/components/components.jsx";
 import { MetricsPanel } from "@/app/components/MetricsPanel";
+import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
+import { getWsOriginFromWindow } from "@/app/utils/ws";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
 
@@ -235,12 +237,12 @@ export default function StudentDetailGrowth({
   setMetrics,
 
   studentID,
-  courseId = "12345678901",
-  wsUrl = "ws://localhost:8888/wsapi/communication_protocol",
 
   essaysInRangeAsc = [],
 }) {
   const selectedMetrics = useMemo(() => normalizeSelectedMetrics(metrics), [metrics]);
+  const { courseId } = useCourseIdContext();
+  const wsUrl = `${origin}/wsapi/communication_protocol`;
 
   const docIdsAsc = useMemo(() => {
     return (Array.isArray(essaysInRangeAsc) ? essaysInRangeAsc : [])
@@ -249,6 +251,11 @@ export default function StudentDetailGrowth({
   }, [essaysInRangeAsc]);
 
   const enabled = !!studentID && docIdsAsc.length > 0 && selectedMetrics.length > 0;
+
+  const origin =
+    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
+    getWsOriginFromWindow() ||
+    "ws://localhost:8888";
 
   const dataScope = useMemo(() => {
     if (!enabled) {

@@ -1,4 +1,5 @@
 import Navbar from "./components/Navbar";
+import { CourseIdProvider } from "@/app/providers/CourseIdProvider";
 import "./globals.css";
 
 export const metadata = {
@@ -8,11 +9,13 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
-        <Navbar />
-        {children}
-      </body>
-    </html>
+    <CourseIdProvider>
+      <html lang="en">
+        <body className="antialiased">
+          <Navbar />
+          {children}
+        </body>
+      </html>
+    </CourseIdProvider>
   );
 }

@@ -8,6 +8,8 @@ import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/componen
 
 import StudentDetailCompare from "./StudentDetailCompare";
 import StudentDetailGrowth from "./StudentDetailGrowth";
+import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
+import { getWsOriginFromWindow } from "@/app/utils/ws";
 
 /* =============================================================
    CONSTANTS
@@ -360,22 +362,28 @@ const buildEssaysFromDocs = ({ studentID, documentIDS, docsObj, data2 }) => {
    ============================================================= */
 
 function StudentDocsByIdFetcher({ studentID, documentIDS, setData2, setErrors2, setConnection2 }) {
+  const { courseId } = useCourseIdContext();
   const dataScope2 = useMemo(() => {
     return {
       wo: {
         execution_dag: "writing_observer",
         target_exports: ["single_student_doc_by_id"],
         kwargs: {
-          course_id: "12345678901",
+          course_id: courseId,
           student_id: documentIDS.map(() => ({ user_id: studentID })),
           document: documentIDS.map((doc_id) => ({ doc_id })),
         },
       },
     };
-  }, [studentID, documentIDS]);
+  }, [courseId, documentIDS, studentID]);
+
+  const origin =
+    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
+    getWsOriginFromWindow() ||
+    "ws://localhost:8888";
 
   const { data, errors, connection } = useLOConnectionDataManager({
-    url: "ws://localhost:8888/wsapi/communication_protocol",
+    url: `${origin}/wsapi/communication_protocol`,
     dataScope: dataScope2,
   });
 
@@ -450,6 +458,7 @@ export default function StudentDetail({ studentId }) {
   const [metrics, setMetrics] = useState([...DEFAULT_METRICS]);
 
   const [openEssay, setOpenEssay] = useState(null);
+  const { courseId } = useCourseIdContext();
 
   // quick range active state (for the pill buttons below)
   const [activeQuickRange, setActiveQuickRange] = useState("all"); // "all" | "3mo" | "6mo" | "9mo"
@@ -461,15 +470,20 @@ export default function StudentDetail({ studentId }) {
         execution_dag: "writing_observer",
         target_exports: ["student_with_docs"],
         kwargs: {
-          course_id: "12345678901",
+          course_id: courseId,
           student_id: [{ user_id: studentID }],
         },
       },
     };
-  }, [studentID]);
+  }, [courseId, studentID]);
+
+  const origin =
+    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
+    getWsOriginFromWindow() ||
+    "ws://localhost:8888";
 
   const { data } = useLOConnectionDataManager({
-    url: "ws://localhost:8888/wsapi/communication_protocol",
+    url: `${origin}/wsapi/communication_protocol`,
     dataScope,
   });
 

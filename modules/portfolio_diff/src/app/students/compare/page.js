@@ -31,11 +31,8 @@ import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/componen
 import dynamic from "next/dynamic";
 
 import { MetricsPanel } from "@/app/components/MetricsPanel";
-
-const WOTextHighlight = dynamic(
-  () => import("lo_dash_react_components/src/lib").then((m) => m.WOTextHighlight),
-  { ssr: false }
-);
+import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
+import { getWsOriginFromWindow } from "@/app/utils/ws";
 
 /* ---------------------- deterministic helpers ---------------------- */
 const seedFrom = (s) => {
@@ -1078,6 +1075,7 @@ export default function EssayComparison() {
   const [urlReady, setUrlReady] = useState(initial.urlReady);
   const [studentID, setStudentID] = useState(initial.studentID);
   const [docIds, setDocIds] = useState(initial.docIds);
+  const { courseId } = useCourseIdContext();
 
   useEffect(() => {
     const next = readCompareParamsFromLocation();
@@ -1129,15 +1127,20 @@ export default function EssayComparison() {
         execution_dag: "writing_observer",
         target_exports: ["student_with_docs"],
         kwargs: {
-          course_id: "12345678901",
+          course_id: courseId,
           student_id: [{ user_id: studentID }],
         },
       },
     };
-  }, [docsListEnabled, studentID]);
+  }, [courseId, docsListEnabled, studentID]);
+
+  const origin =
+    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
+    getWsOriginFromWindow() ||
+    "ws://localhost:8888";
 
   const { data: loListData } = useLOConnectionDataManager({
-    url: "ws://localhost:8888/wsapi/communication_protocol",
+    url: `${origin}/wsapi/communication_protocol`,
     dataScope: dataScopeList,
   });
 
@@ -1165,14 +1168,14 @@ export default function EssayComparison() {
         execution_dag: "writing_observer",
         target_exports: ["single_student_docs_with_nlp_annotations"],
         kwargs: {
-          course_id: "12345678901",
+          course_id: courseId,
           student_id: docIds.map(() => ({ user_id: studentID })),
           document: docIds.map((doc_id) => ({ doc_id })),
           nlp_options: selectedMetrics,
         },
       },
     };
-  }, [enabled, studentID, docIds, selectedMetrics]);
+  }, [enabled, courseId, docIds, selectedMetrics, studentID]);
 
   const { data: loData, errors: loErrors, connection: loConnection } = useLOConnectionDataManager({
     url: "ws://localhost:8888/wsapi/communication_protocol",

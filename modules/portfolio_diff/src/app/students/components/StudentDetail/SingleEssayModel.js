@@ -17,6 +17,8 @@ import {
 
 import { MetricsPanel } from "@/app/components/MetricsPanel";
 import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/components/components.jsx";
+import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
+import { getWsOriginFromWindow } from "@/app/utils/ws";
 
 /* =========================================================
    Helpers
@@ -148,10 +150,55 @@ function initialsFromStudentKey(studentKey) {
 }
 
 /* =========================================================
-   Charts (0% to 100%)
+   Charts (Auto-zoom for low ranges + delta annotation)
 ========================================================= */
 
-function BaselineCurrentChart({ baselinePct, currentPct, height = 120 }) {
+/**
+ * Tick step selection for a given range.
+ */
+function niceStep(range) {
+  // Handles % values. Favor readable tick increments.
+  if (range <= 0.5) return 0.1;
+  if (range <= 1) return 0.2;
+  if (range <= 2) return 0.5;
+  if (range <= 5) return 1;
+  if (range <= 10) return 2;
+  if (range <= 20) return 5;
+  if (range <= 40) return 10;
+  return 25;
+}
+
+function buildTicks(yMin, yMax, maxTicks = 5) {
+  const span = Math.max(1e-6, yMax - yMin);
+  const step = niceStep(span);
+  const start = Math.floor(yMin / step) * step;
+  const end = Math.ceil(yMax / step) * step;
+
+  const ticks = [];
+  for (let v = start; v <= end + 1e-9; v += step) {
+    if (v >= yMin - 1e-9 && v <= yMax + 1e-9) ticks.push(Number(v.toFixed(3)));
+  }
+
+  // If too many ticks, thin them.
+  if (ticks.length > maxTicks) {
+    const stride = Math.ceil(ticks.length / maxTicks);
+    return ticks.filter((_, i) => i % stride === 0);
+  }
+
+  // If too few ticks, ensure ends are present.
+  if (!ticks.length) return [yMin, yMax];
+  if (ticks[0] !== yMin) ticks.unshift(yMin);
+  if (ticks[ticks.length - 1] !== yMax) ticks.push(yMax);
+  return ticks;
+}
+
+function BaselineCurrentChart({
+  baselinePct,
+  currentPct,
+  height = 120,
+  // If true, will auto-zoom when values are in a narrow band.
+  autoZoom = true,
+}) {
   const width = 520;
   const padL = 42;
   const padR = 10;
@@ -161,8 +208,57 @@ function BaselineCurrentChart({ baselinePct, currentPct, height = 120 }) {
   const b = Number.isFinite(baselinePct) ? Number(baselinePct) : 0;
   const c = Number.isFinite(currentPct) ? Number(currentPct) : 0;
 
-  const yMin = 0;
-  const yMax = 100;
+  // Compute delta annotations
+  const deltaPP = c - b;
+  const relDelta = b !== 0 ? (deltaPP / b) * 100 : null;
+
+  // Auto-zoom logic:
+  // - If values are both low and close, use a tighter y-range around them.
+  // - Always label when zoom is active.
+  const minVal = Math.min(b, c);
+  const maxVal = Math.max(b, c);
+  const spread = maxVal - minVal;
+
+  const shouldZoom =
+    autoZoom &&
+    // values are in lower part of scale OR range is very tight
+    (maxVal <= 15 || spread <= 3) &&
+    // but avoid zooming when values are near extremes where it could look odd
+    maxVal < 98;
+
+  let yMin = 0;
+  let yMax = 100;
+  let zoomLabel = "";
+
+  if (shouldZoom) {
+    // Pad around values so dots aren't hugging edges.
+    // Use a minimum window so it doesn't get too twitchy.
+    const pad = Math.max(0.6, spread * 0.6);
+    yMin = clamp(minVal - pad, 0, 100);
+    yMax = clamp(maxVal + pad, 0, 100);
+
+    // Ensure a reasonable minimum span
+    const minSpan = 4;
+    if (yMax - yMin < minSpan) {
+      const mid = (yMin + yMax) / 2;
+      yMin = clamp(mid - minSpan / 2, 0, 100);
+      yMax = clamp(mid + minSpan / 2, 0, 100);
+    }
+
+    // Round bounds to nice steps
+    const span = yMax - yMin;
+    const step = niceStep(span);
+    yMin = clamp(Math.floor(yMin / step) * step, 0, 100);
+    yMax = clamp(Math.ceil(yMax / step) * step, 0, 100);
+
+    // If rounding collapsed the range, fallback
+    if (yMax <= yMin) {
+      yMin = clamp(minVal - 2, 0, 100);
+      yMax = clamp(maxVal + 2, 0, 100);
+    }
+
+    zoomLabel = `Zoomed: ${yMin.toFixed(1)}–${yMax.toFixed(1)}%`;
+  }
 
   const xBaseline = padL;
   const xCurrent = width - padR;
@@ -174,7 +270,20 @@ function BaselineCurrentChart({ baselinePct, currentPct, height = 120 }) {
 
   const yBaseline = Y(b);
   const yCurrent = Y(c);
-  const tickTargets = [0, 25, 50, 75, 100];
+
+  const ticks = shouldZoom ? buildTicks(yMin, yMax, 5) : [0, 25, 50, 75, 100];
+
+  // For small spans, show one decimal tick labels; otherwise integer.
+  const tickFmt = (v) => {
+    const span = yMax - yMin;
+    const needsDecimal = span <= 10 || shouldZoom;
+    return `${needsDecimal ? Number(v).toFixed(1) : Number(v).toFixed(0)}%`;
+  };
+
+  // Delta label text
+  const deltaText = `${deltaPP >= 0 ? "+" : ""}${deltaPP.toFixed(1)} pp${
+    relDelta === null ? "" : ` (${relDelta >= 0 ? "+" : ""}${relDelta.toFixed(0)}%)`
+  }`;
 
   return (
     <svg
@@ -184,18 +293,27 @@ function BaselineCurrentChart({ baselinePct, currentPct, height = 120 }) {
       role="img"
       aria-label="Baseline vs Current chart"
     >
-      {tickTargets.map((t) => {
+      {/* Grid + ticks */}
+      {ticks.map((t) => {
         const y = Y(t);
         return (
           <g key={t}>
-            <line x1={padL} x2={width - padR} y1={y} y2={y} stroke="rgb(226,232,240)" strokeWidth="1" />
+            <line
+              x1={padL}
+              x2={width - padR}
+              y1={y}
+              y2={y}
+              stroke="rgb(226,232,240)"
+              strokeWidth="1"
+            />
             <text x={padL - 8} y={y + 4} textAnchor="end" fontSize="10" fill="rgb(100,116,139)">
-              {t}%
+              {tickFmt(t)}
             </text>
           </g>
         );
       })}
 
+      {/* Axes */}
       <line x1={padL} x2={padL} y1={padT} y2={height - padB} stroke="rgb(148,163,184)" strokeWidth="1" />
       <line
         x1={padL}
@@ -206,6 +324,7 @@ function BaselineCurrentChart({ baselinePct, currentPct, height = 120 }) {
         strokeWidth="1"
       />
 
+      {/* Axis labels */}
       <text x={xBaseline} y={height - 10} textAnchor="start" fontSize="10" fill="rgb(100,116,139)">
         Baseline
       </text>
@@ -213,16 +332,60 @@ function BaselineCurrentChart({ baselinePct, currentPct, height = 120 }) {
         Current
       </text>
 
+      {/* Zoom badge */}
+      {shouldZoom ? (
+        <g>
+          <rect
+            x={padL + 6}
+            y={padT + 2}
+            rx="6"
+            ry="6"
+            width="155"
+            height="18"
+            fill="rgb(241,245,249)"
+            stroke="rgb(226,232,240)"
+          />
+          <text x={padL + 12} y={padT + 15} fontSize="10" fill="rgb(71,85,105)">
+            {zoomLabel}
+          </text>
+        </g>
+      ) : null}
+
+      {/* Slope line and points */}
       <line x1={xBaseline} x2={xCurrent} y1={yBaseline} y2={yCurrent} stroke="rgb(15,118,110)" strokeWidth="2" />
       <circle cx={xBaseline} cy={yBaseline} r="4" fill="rgb(148,163,184)" />
       <circle cx={xCurrent} cy={yCurrent} r="4.5" fill="rgb(190,24,93)" />
 
+      {/* Values */}
       <text x={xBaseline + 6} y={yBaseline - 6} textAnchor="start" fontSize="10" fill="rgb(71,85,105)">
         {b.toFixed(1)}%
       </text>
       <text x={xCurrent - 6} y={yCurrent - 6} textAnchor="end" fontSize="10" fill="rgb(71,85,105)">
         {c.toFixed(1)}%
       </text>
+
+      {/* Delta annotation centered */}
+      <g>
+        <rect
+          x={(padL + (width - padR)) / 2 - 54}
+          y={height - padB - 20}
+          rx="6"
+          ry="6"
+          width="108"
+          height="16"
+          fill="rgb(255,255,255)"
+          stroke="rgb(226,232,240)"
+        />
+        <text
+          x={(padL + (width - padR)) / 2}
+          y={height - padB - 8}
+          textAnchor="middle"
+          fontSize="10"
+          fill="rgb(71,85,105)"
+        >
+          {deltaText}
+        </text>
+      </g>
     </svg>
   );
 }
@@ -538,7 +701,7 @@ export function SingleEssayModal({
 }
 
 /* =========================================================
-   Inner modal (Trajectory + Actionable Feedback fully included)
+   Inner modal
 ========================================================= */
 
 function SingleEssayInnerModal({ studentKey, docId, docIds }) {
@@ -556,6 +719,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
   const [priority, setPriority] = useState("all");
   const [includeEvidence, setIncludeEvidence] = useState(true);
   const [includeProcessSignals, setIncludeProcessSignals] = useState(true);
+  const { courseId } = useCourseIdContext();
 
   const setSelectedMetrics = (next) => {
     setSelectedMetricsState((prev) => {
@@ -589,14 +753,14 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
         execution_dag: "writing_observer",
         target_exports: ["single_student_docs_with_nlp_annotations"],
         kwargs: {
-          course_id: "12345678901",
+          course_id: courseId,
           student_id: docIds.map(() => ({ user_id: studentKey })),
           document: docIds.map((d) => ({ doc_id: d })),
           nlp_options: selectedMetrics,
         },
       },
     };
-  }, [exportEnabled, studentKey, docIds, selectedMetrics]);
+  }, [exportEnabled, courseId, docIds, selectedMetrics, studentKey]);
 
   // The key that forces LORunner (and hook) remount
   const scopeKey = useMemo(() => {
@@ -674,7 +838,6 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
 
   /* --------------------------
      Actionable feedback content
-     (keep these blocks as-is or replace with real output later)
   -------------------------- */
 
   const feedbackBlocks = useMemo(() => {
@@ -761,6 +924,11 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
     return blocks;
   }, [feedbackBlocks, feedbackMode, ordering, priority]);
 
+  const origin =
+    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
+    getWsOriginFromWindow() ||
+    "ws://localhost:8888";
+
   return (
     <div className="bg-gray-50 h-full flex flex-col min-h-0">
       {/* Hidden runner that forces re-run by remounting on scopeKey changes */}
@@ -768,7 +936,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
         <LORunner
           key={scopeKey}
           scopeKey={scopeKey}
-          url={"ws://localhost:8888/wsapi/communication_protocol"}
+          url={`${origin}/wsapi/communication_protocol`}
           dataScope={dataScope}
           onData={(d) => setLoData(d)}
           onErrors={(e) => setLoErrors(e)}
