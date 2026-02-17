@@ -360,7 +360,7 @@ def init():
     # Google, Canvas, and Schoology all use integrations instead of ajax when called
     elif roster_source in ["google_api"]:
         ajax = google_ajax
-    elif roster_source in ["canvas_api", 'schoology_api']:
+    elif roster_source in ["canvas_api", 'schoology']:
         pass
     elif roster_source in ["all"]:
         ajax = all_ajax
@@ -369,7 +369,7 @@ def init():
             "Settings file `roster_data` element should have `source` field\n"
             "set to either:\n"
             "  test        (retrieve from files courses.json and students.json)\n"
-            "  google_api | canvas_api | schoology_api  (retrieve roster data from an api)\n"
+            "  google_api | canvas_api | schoology  (retrieve roster data from an api)\n"
             "  filesystem  (retrieve roster data from file system hierarchy\n"
             "  all  (retrieve roster data as all students)"
         )
