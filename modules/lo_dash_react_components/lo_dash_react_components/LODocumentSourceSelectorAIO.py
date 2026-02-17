@@ -41,6 +41,16 @@ class LODocumentSourceSelectorAIO(dbc.Card):
             'subcomponent': 'timestamp_input',
             'aio_id': aio_id
         }
+        title_text_wrapper = lambda aio_id: {
+            'component': 'LODocumentSourceSelectorAIO',
+            'subcomponent': 'title_text_wrapper',
+            'aio_id': aio_id
+        }
+        title_text_input = lambda aio_id: {
+            'component': 'LODocumentSourceSelectorAIO',
+            'subcomponent': 'title_text_input',
+            'aio_id': aio_id
+        }
         kwargs_store = lambda aio_id: {
             'component': 'LODocumentSourceSelectorAIO',
             'subcomponent': 'kwargs_store',
@@ -60,7 +70,8 @@ class LODocumentSourceSelectorAIO(dbc.Card):
                 id=self.ids.source_selector(aio_id),
                 options={'latest': 'Latest Document',
                          'assignment': 'Assignment',
-                         'timestamp': 'Specific Time'},
+                         'timestamp': 'Specific Time',
+                         'title_text': 'Text in Title'},
                 inline=True,
                 value='latest'),
             html.Div('Additional Arguments'),
@@ -78,6 +89,13 @@ class LODocumentSourceSelectorAIO(dbc.Card):
                         value=datetime.datetime.now().strftime("%H:%M"))
                 ])
             ], id=self.ids.datetime_wrapper(aio_id)),
+            html.Div([
+                dbc.Input(
+                    id=self.ids.title_text_input(aio_id),
+                    type='text',
+                    placeholder='Enter text to match document titles'
+                )
+            ], id=self.ids.title_text_wrapper(aio_id)),
             dcc.Store(id=self.ids.kwargs_store(aio_id), data={'src': 'latest'})
         ])
         component = [
@@ -88,13 +106,15 @@ class LODocumentSourceSelectorAIO(dbc.Card):
 
     # Update data
     clientside_callback(
-        '''function (src, assignment, date, time) {
+        '''function (src, assignment, date, time, titleText) {
             // if (clicks === 0) { return window.dash_clientside.no_update; }
             let kwargs = {};
             if (src === 'assignment') {
                 kwargs.assignment = assignment;
             } else if (src === 'timestamp') {
                 kwargs.requested_timestamp = new Date(`${date}T${time}`).getTime().toString()
+            } else if (src === 'title_text') {
+                kwargs.title_text = titleText;
             }
             return {src, kwargs};
         }
@@ -104,20 +124,24 @@ class LODocumentSourceSelectorAIO(dbc.Card):
         Input(ids.assignment_input(MATCH), 'value'),
         Input(ids.date_input(MATCH), 'date'),
         Input(ids.timestamp_input(MATCH), 'value'),
+        Input(ids.title_text_input(MATCH), 'value'),
     )
 
     clientside_callback(
         '''function (src) {
             if (src === 'assignment') {
-                return ['d-none', ''];
+                return ['d-none', '', 'd-none'];
             } else if (src === 'timestamp') {
-                return ['', 'd-none']
+                return ['', 'd-none', 'd-none']
+            } else if (src === 'title_text') {
+                return ['d-none', 'd-none', '']
             }
-            return ['d-none', 'd-none'];
+            return ['d-none', 'd-none', 'd-none'];
         }
         ''',
         Output(ids.datetime_wrapper(MATCH), 'className'),
         Output(ids.assignment_wrapper(MATCH), 'className'),
+        Output(ids.title_text_wrapper(MATCH), 'className'),
         Input(ids.source_selector(MATCH), 'value'),
     )
 

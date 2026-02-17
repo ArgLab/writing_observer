@@ -40,6 +40,7 @@ unwind = q.call('unwind')
 group_docs_by = q.call('writing_observer.group_docs_by')
 
 document_access_ts = q.call('writing_observer.fetch_doc_at_timestamp')
+document_by_title_text = q.call('writing_observer.fetch_doc_by_title_text')
 
 source_selector = q.call('source_selector')
 
@@ -85,7 +86,8 @@ gpt_bulk_essay = q.call('wo_bulk_essay_analysis.gpt_essay_prompt')
 document_sources = source_selector(
     sources={'timestamp': q.variable('docs_at_ts'),
              'latest': q.variable('doc_ids'),
-             'assignment': q.variable('assignment_docs')
+             'assignment': q.variable('assignment_docs'),
+             'title_text': q.variable('docs_by_title_text')
             },
     source=q.parameter('doc_source', required=False, default='latest')
 )
@@ -142,6 +144,10 @@ EXECUTION_DAG = {
         # fetch the doc less than or equal to a timestamp
         'timestamped_docs': q.select(q.keys('writing_observer.document_access_timestamps', STUDENTS=q.variable('roster'), STUDENTS_path='user_id'), fields={'timestamps': 'timestamps'}),
         'docs_at_ts': document_access_ts(overall_timestamps=q.variable('timestamped_docs'), kwargs=q.parameter('doc_source_kwargs')),
+
+        # fetch the latest matching document by title text
+        'raw_doc_lists': q.select(q.keys('writing_observer.document_list', STUDENTS=q.variable('roster'), STUDENTS_path='user_id'), fields={'docs': 'docs'}),
+        'docs_by_title_text': document_by_title_text(document_lists=q.variable('raw_doc_lists'), kwargs=q.parameter('doc_source_kwargs')),
 
         # figure out where to source document ids from
         # current options include `ts` for a given timestamp
@@ -264,12 +270,12 @@ REDUCERS = [
         'function': writing_observer.writing_analysis.gdoc_scope_time_on_task,
         'default': {'saved_ts': 0}
     },
-    {
-        'context': "org.mitros.writing_analytics",
-        'scope': writing_observer.writing_analysis.gdoc_tab_scope,
-        'function': writing_observer.writing_analysis.gdoc_tab_scope_time_on_task,
-        'default': {'saved_ts': 0}
-    },
+    # {
+    #     'context': "org.mitros.writing_analytics",
+    #     'scope': writing_observer.writing_analysis.gdoc_tab_scope,
+    #     'function': writing_observer.writing_analysis.gdoc_tab_scope_time_on_task,
+    #     'default': {'saved_ts': 0}
+    # },
     {
         'context': "org.mitros.writing_analytics",
         'scope': writing_observer.writing_analysis.gdoc_scope,
