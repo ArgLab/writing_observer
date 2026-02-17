@@ -8,7 +8,7 @@ This may require also running
 npm audit fix
 
 You will also need to install writing_observer and package up lo_event to use inside the project.
-Place to clone from: https://github.com/ETS-Next-Gen/writing_observer
+Place to clone from: https://github.com/ArgLab/writing_observer
 cd to cloned directory, type npm install
 
 Then, inside writing_observer/modules/lo_event:

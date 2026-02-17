@@ -15,14 +15,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ETS-Next-Gen/writing_observer.git"
+    "url": "git+https://github.com/ArgLab/writing_observer.git"
   },
   "author": "",
   "license": "SEE LICENSE IN LICENSE.TXT",
   "bugs": {
-    "url": "https://github.com/ETS-Next-Gen/writing_observer/issues"
+    "url": "https://github.com/ArgLab/writing_observer/issues"
   },
-  "homepage": "https://github.com/ETS-Next-Gen/writing_observer#readme",
+  "homepage": "https://github.com/ArgLab/writing_observer#readme",
   "devDependencies": {
     "@actions/core": "^1.10.0",
     "eslint": "^8.38.0",

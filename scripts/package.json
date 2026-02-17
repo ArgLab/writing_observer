@@ -8,14 +8,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ETS-Next-Gen/writing_observer.git"
+    "url": "git+https://github.com/ArgLab/writing_observer.git"
   },
   "author": "Piotr Mitros",
   "license": "AGPL-3.0",
   "bugs": {
-    "url": "https://github.com/ETS-Next-Gen/writing_observer/issues"
+    "url": "https://github.com/ArgLab/writing_observer/issues"
   },
-  "homepage": "https://github.com/ETS-Next-Gen/writing_observer#readme",
+  "homepage": "https://github.com/ArgLab/writing_observer#readme",
   "dependencies": {
     "ws": "^8.17.1"
   }

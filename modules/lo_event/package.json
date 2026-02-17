@@ -15,14 +15,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ETS-Next-Gen/writing_observer.git"
+    "url": "git+https://github.com/ArgLab/writing_observer.git"
   },
   "author": "Piotr Mitros",
   "license": "SEE LICENSE IN license.txt",
   "bugs": {
-    "url": "https://github.com/ETS-Next-Gen/writing_observer/issues"
+    "url": "https://github.com/ArgLab/writing_observer/issues"
   },
-  "homepage": "https://github.com/ETS-Next-Gen/writing_observer#readme",
+  "homepage": "https://github.com/ArgLab/writing_observer#readme",
   "type": "module",
   "dependencies": {
     "aws-sdk": "^2.1614.0",
