@@ -365,7 +365,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       decodedParams.option_hash = appliedHash;
       decodedParams.doc_source = docKwargs.src;
       decodedParams.doc_source_kwargs = docKwargs.kwargs;
-      decodedParams.rerun_dag_delay = 120;
+      decodedParams.rerun_dag_delay = 45;
       const outgoingMessage = {
         wo_classroom_text_highlighter_query: {
           execution_dag: 'writing_observer',
