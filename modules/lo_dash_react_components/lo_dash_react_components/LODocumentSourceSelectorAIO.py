@@ -146,19 +146,39 @@ class LODocumentSourceSelectorAIO(dbc.Card):
     )
 
     clientside_callback(
-        '''async function (id, hash) {
-            if (hash.length === 0) { return window.dash_clientside.no_update; }
+        '''async function (id, hash, currentSource) {
+            const noUpdate = window.dash_clientside.no_update;
+            if (!hash || hash.length === 0) { return [noUpdate, noUpdate, noUpdate]; }
             const decoded = decode_string_dict(hash.slice(1));
-            if (!decoded.course_id) { return window.dash_clientside.no_update; }
+            if (!decoded.course_id) { return [noUpdate, noUpdate, noUpdate]; }
+
             const response = await fetch(`${window.location.protocol}//${window.location.hostname}:${window.location.port}/webapi/courseassignments/${decoded.course_id}`);
             const data = await response.json();
-            const options = data.map(function (item) {
+            const assignmentOptions = data.map(function (item) {
                 return { label: item.title, value: item.id };
             });
-            return options;
+
+            const sourceOptions = [
+                { label: 'Latest Document', value: 'latest' },
+                { label: 'Specific Time', value: 'timestamp' },
+                { label: 'Text in Title', value: 'title_text' },
+            ];
+            if (assignmentOptions.length > 0) {
+                sourceOptions.splice(1, 0, { label: 'Assignment', value: 'assignment' });
+            }
+
+            let sourceValue = currentSource;
+            if (sourceValue === 'assignment' && assignmentOptions.length === 0) {
+                sourceValue = 'latest';
+            }
+
+            return [assignmentOptions, sourceOptions, sourceValue];
         }
         ''',
         Output(ids.assignment_input(MATCH), 'options'),
+        Output(ids.source_selector(MATCH), 'options'),
+        Output(ids.source_selector(MATCH), 'value'),
         Input(ids.source_selector(MATCH), 'id'),
         Input('_pages_location', 'hash'),
+        State(ids.source_selector(MATCH), 'value'),
     )
