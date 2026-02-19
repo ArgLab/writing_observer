@@ -7,7 +7,7 @@ learning analytics dashboard to help instructors be able to manage
 student learning processes, and in particular, student writing
 processes.
 
-![linting](https://github.com/ETS-Next-Gen/writing_observer/actions/workflows/pycodestyle.yml/badge.svg)
+![linting](https://github.com/ArgLab/writing_observer/actions/workflows/pycodestyle.yml/badge.svg)
 
 ## Learning Observer
 

@@ -6,7 +6,7 @@
     "author": "Piotr Mitros, Bradley Erickson",
     "repository": {
         "type": "git",
-        "url": "https://github.com/ETS-Next-Gen/writing_observer/tree/master/extension/writing-process"
+        "url": "https://github.com/ArgLab/writing_observer/tree/master/extension/writing-process"
     },
     "scripts": {
         "ext:start": "xt-build -e dev -w",

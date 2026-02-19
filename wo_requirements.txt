@@ -1,4 +1,4 @@
-writing_observer @ git+https://github.com/ETS-Next-Gen/writing_observer.git#subdirectory=modules/writing_observer/
-lo_gpt @ git+https://github.com/ETS-Next-Gen/writing_observer.git#subdirectory=modules/lo_gpt/
-wo_bulk_essay_analysis @ git+https://github.com/ETS-Next-Gen/writing_observer.git#subdirectory=modules/wo_bulk_essay_analysis/
-wo_classroom_text_highlighter @ git+https://github.com/ETS-Next-Gen/writing_observer.git#subdirectory=modules/wo_classroom_text_highlighter/
+writing_observer @ git+https://github.com/ArgLab/writing_observer.git#subdirectory=modules/writing_observer/
+lo_gpt @ git+https://github.com/ArgLab/writing_observer.git#subdirectory=modules/lo_gpt/
+wo_bulk_essay_analysis @ git+https://github.com/ArgLab/writing_observer.git#subdirectory=modules/wo_bulk_essay_analysis/
+wo_classroom_text_highlighter @ git+https://github.com/ArgLab/writing_observer.git#subdirectory=modules/wo_classroom_text_highlighter/

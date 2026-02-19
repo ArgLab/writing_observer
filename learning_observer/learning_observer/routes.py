@@ -379,7 +379,7 @@ def register_repo_routes(app, repos):
     An example repo is:
 
     {
-        'url': 'https://github.com/ETS-Next-Gen/writing_observer.git',  // URL to the repo; downloaded if not already here
+        'url': 'https://github.com/ArgLab/writing_observer.git',  // URL to the repo; downloaded if not already here
         'prefix': 'modules/writing_observer/writing_observer/static',   // Path in repo to serve static files from
         'module': 'wobserver',                                          // Module name to use in the static path
 
