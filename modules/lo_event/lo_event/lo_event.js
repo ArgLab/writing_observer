@@ -8,6 +8,7 @@ import * as Queue from './queue.js';
 import * as disabler from './disabler.js';
 import * as debug from './debugLog.js';
 import * as util from './util.js';
+import { initializeUrlLockFields } from './urlLockFields.js';
 
 export const QueueType = Queue.QueueType;
 
@@ -22,7 +23,6 @@ const INIT_STATES = {
 
 let initialized = INIT_STATES.NOT_STARTED; // Current FSM state
 let currentState = new Promise((resolve, reject) => { resolve(); }); // promise pipeline to ensure we handle all initialization
-
 
 let loggersEnabled = []; // A list of all loggers which should receive events.
 let queue;
@@ -59,7 +59,7 @@ async function initializeLoggers () {
  * When initializing `lo_event`, clients can set which metadata items
  * they wish to include.
  */
-export async function compileMetadata(metadataTasks) {
+export async function compileMetadata (metadataTasks) {
   const taskPromises = metadataTasks.map(async task => {
     try {
       const result = await Promise.resolve(task.func());
@@ -74,7 +74,6 @@ export async function compileMetadata(metadataTasks) {
   setFieldSet(results);
   return results.filter(Boolean);
 }
-
 
 /**
  * Set specific key/value pairs using the `lock_fields`
@@ -145,10 +144,11 @@ export function init (
     .then(initializeLoggers)
     .then(() => setFieldSet([{ source, version }]))
     .then(() => compileMetadata(metadata));
-  if(sendBrowserInfo) {
+  initializeUrlLockFields(setFieldSet);
+  if (sendBrowserInfo) {
     // In the future, some or all of this might be sent on every
     // reconnect
-    logEvent("BROWSER_INFO", getBrowserInfo());
+    logEvent('BROWSER_INFO', getBrowserInfo());
   }
 }
 
