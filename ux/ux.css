@@ -1,0 +1,38 @@
+.wa-row-tile {
+    min-height: 350px;
+}
+
+.wa-col-tile {
+    min-height: 350px;
+}
+
+/* Flip based on https://davidwalsh.name/css-flip */
+.wa-flip-container {
+    perspective: 1000px;
+}
+
+.wa-flipper {
+    transition: 0.6s;
+    transform-style: preserve-3d;
+    position: relative;
+}
+
+.wa-front, .wa-back {
+	backface-visibility: hidden;
+	position: absolute;
+	top: 20px;
+	left: 20px;
+}
+
+/* front pane, placed above back */
+.wa-front {
+	z-index: 2;
+
+	/* for firefox 31 */
+	transform: rotateY(0deg);
+}
+
+/* back, initially hidden pane */
+.wa-back {
+	transform: rotateY(180deg);
+}

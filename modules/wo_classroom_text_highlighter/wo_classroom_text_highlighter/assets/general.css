@@ -1,0 +1,24 @@
+.loading-circle {
+    border: 4px solid #e0e0e0;
+    border-top: 4px solid var(--bs-primary);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.preset button:last-child {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}

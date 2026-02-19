@@ -1,0 +1,132 @@
+
+/* 
+    Customize the scrollbar (Chrome only, but its okay cause they use Chromebooks)
+    Set size of scrollbar
+    Set track (slider track)
+    Set thumb (slider on track)
+    Set hover/active styles
+ */
+
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgb(179 177 177);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgb(136 136 136);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgb(100 100 100);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:active {
+    background: rgb(68 68 68);
+    border-radius: 5px;
+}
+
+/*
+    Provides a shift and a shadow to student cards
+    I think it helps to focus in on one student, but the shadow itself could be improved upon
+    Try hovering over a student's card
+*/
+.shadow-card:hover {
+    transition: all 0.2s ease-out;
+    box-shadow: 0 2px 8px var(--bs-gray-500);
+    border: 1px solid #ccc;
+    background-color: white;
+}
+
+.shadow-card:hover::before {
+    transform: scale(2.15);
+}
+
+/* Style the text element (the box of text) on student cards */
+.student-card-text {
+    max-height: 250px;
+    overflow: auto;
+    border: var(--bs-gray-100) solid 1px;
+    border-radius: 0.4rem;
+    margin: 1px;
+}
+
+/* Larger font size helper class  */
+.font-size-lg { font-size: 1.2rem; }
+
+/*
+    Add some background so you can see which option of a checklist you are hovering
+    Add darker background for nested-forms
+    Try hovering over an option in the Settings menu
+*/
+.form-check:hover {
+    transition: all 0.2s ease-out;
+    background-color: var(--bs-gray-100);
+    box-shadow: 0 0 5px var(--bs-gray-100);
+    border-radius: 0.4rem;
+}
+
+.nested-form:hover {
+    transition: all 0.2s ease-out;
+    background-color: var(--bs-gray-300);
+    box-shadow: 0 0 5px var(--bs-gray-300);
+    border-radius: 0.4rem;
+}
+
+/*
+Style dropdown menu component to be an outline btn
+with appropriate colors
+*/
+.dropdown-menu-outline-dark {
+    color: #343a40;
+    background-color: transparent;
+}
+
+.dropdown-menu-outline-dark:hover {
+    color: white;
+    background-color: #343a40;
+}
+
+.dropdown-item:focus, .dropdown-item:hover {
+    color: #212529;
+    background-color: var(--bs-gray-300);
+}
+
+/*
+Adjust styling for parent and children items
+Parents are disabled and shift to the left
+Children are indented to the right
+*/
+.form-check-input:disabled {
+    display: none;
+}
+
+.nested-form:has(.subchecklist-label) {
+    margin-left: 1.5em;
+}
+
+.nested-form:has(.form-check-input:disabled) {
+    padding-left: 0;
+}
+
+/*
+Animation to hide the alert
+Some items need a slight delay which is why we don't adjust opacity
+until halfway through
+*/
+@keyframes delay-hide {
+    0% {opacity: 1;}
+    50% {opacity: 1;}
+    100% {opacity: 0;}
+}
+
+.hidden-alert {
+    opacity: 0;
+    animation: delay-hide 2s linear;
+}

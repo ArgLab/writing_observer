@@ -1,0 +1,558 @@
+@import "../../node_modules/bootstrap/scss/bootstrap";
+@import "../../node_modules/bootstrap/scss/variables";
+
+:root {
+  --mastery-color: hsl(120, 80%, 75%);
+  --zpd-color: hsl(60, 80%, 75%);
+  --fail-color: hsl(10, 80%, 75%);
+  --none-color: hsl(0, 0%, 80%);
+  --scale: 200px;
+  --mastery-background: palegreen;
+  --zpd-background: lightyellow;
+  --fail-background: bisque;
+  --mastery-foreground: darkgreen;
+  --zpd-foreground: brown;
+  --fail-foreground: darkred;
+  --background-color: whitesmoke;
+  --text-color: darkslategray;
+  --table-background: whitesmoke;
+  font-family: open-sans;
+}
+
+.LOTableView {
+  .LOControls {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px;
+    padding: 8px;
+    background-color: rgba(255,255,255,0.1);
+    box-shadow: 0px 5px 5px -5px rgba(0,0,0,0.25),
+                0px -5px 5px -5px rgba(0,0,0,0.15);
+    h2 {
+      font-size: 12pt;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    label {
+      margin-left: 8px;
+      font-weight: normal;
+      font-weight: 200;
+    }
+    input {
+      margin-right: 8px;
+    }
+  }
+
+  .card {
+      align-items: center;
+      background-color: white;
+      box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+      margin: 8px;
+      padding: 16px;
+      display: flex;
+  }
+
+  .card-list {
+    display: flex;
+    flex-wrap: wrap;
+    margin: -8px;
+
+    .column:hover {
+      background-color: rgba(0,0,0,0.1);
+    }
+
+    .avatar {
+      border-radius: 50%;
+      width: 64px;
+      height: 64px;
+    }
+
+    .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #555;
+    }
+
+    .name {
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .columns {
+      display: flex;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      vertical-align: top;
+    }
+
+    .value {
+      font-size: 16px;
+    }
+
+    &:not(.card-grid-layout) {
+      .card {
+        width: 100%;
+        height: 125px;
+        flex-direction: row;
+        justify-content: space-between;
+      }
+
+      .columns {
+        flex-direction: row;
+        width: 100%;
+      }
+
+      .column {
+        justify-content: top;
+        margin-right: 20px;
+        width: calc(100% / 4);
+        text-align: center;
+      }
+
+      .value {
+        max-height: 100px;
+        overflow: scroll;
+      }
+    }
+
+    &.card-grid-layout {
+      .card {
+        width: 300px;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .columns {
+        flex-direction: column;
+        margin-top: 16px;
+      }
+
+      .column {
+        margin-bottom: 8px;
+      }
+    }
+  }
+}
+
+#student-select-header {
+    .nav-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: lightgray;
+        width: 100vw;
+        padding: 10px 0;
+        box-sizing: border-box;
+        margin: 0;
+        font-family: Open Sans Condensed, sans-serif;
+        font-size: 28px;
+        font-weight: lighter;
+        color: var(--text-color);
+    }
+
+    .header-student {
+        text-align: center;
+        flex: 1;
+        cursor: pointer;
+    }
+
+    .button-right {
+      text-align: right;
+    }
+  
+    .button-left {
+      text-align: left;
+    }
+  
+    .button {
+        padding: 10px;
+    }
+
+    .dropdown {
+        position: absolute;
+        top: 40px;
+        left: 50%;
+        transform: translate(-50%, 0);
+        min-width: 300px;
+        width: 33.33%;
+        background-color: white;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        overflow-x: hidden;
+        max-height: 600px;
+        overflow-y: scroll;
+        background-color: white;
+        border: 1px solid gray;
+        z-index: 2;
+    }
+
+    .dropdown-item {
+        padding: 10px;
+        display: block;
+        text-align: center;
+    }
+
+    .dropdown-item-selected {
+        background-color: lightgray;
+    }
+}
+
+body {
+  background-color: var(--background-color);
+  margin: 0;
+  padding: 0;
+}
+
+.arrow {
+  position: absolute;
+  width: 2px;
+  background-color: red;
+  transform-origin: bottom center;
+  z-index: 2;
+}
+
+.arrow::before {
+  position: absolute;
+  height: 0px;
+  width: 0px;
+  border: 6px solid transparent;
+  border-bottom: 8px solid red;
+  content: "";
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+
+#zpd-wrapper {
+  position: relative;
+
+  @mixin columnMixin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50%;
+    height: 100vh;
+    float: left;
+  }
+
+  .left-column {
+    @include columnMixin;
+  }
+
+  .right-column {
+    @include columnMixin;
+    flex-direction: column;
+  }
+
+  @mixin circleMixin($size, $zone) {
+    position: absolute;
+    width: calc(var(--scale) * #{$size});
+    height: calc(var(--scale) * #{$size});
+    border-radius: 50%;
+    background-color: var(--#{$zone}-background);
+    box-shadow: 2px 2px 5px var(--#{$zone}-foreground);
+  }
+
+  .znd-circle {
+    @include circleMixin(3, fail);
+  }
+
+  .znd-circle-label {
+    padding: calc(var(--scale) * 0.5);
+  }
+
+  .zpd-circle {
+    @include circleMixin(2, zpd);
+    top: calc(var(--scale) * 0.5);
+    left: calc(var(--scale) * 0.5);
+  }
+  /* Shift label inside by about w/4√2. We made it a smidge
+     less because it looks better */
+  .zpd-circle-label {
+    padding: calc(var(--scale) * 0.3);
+  }
+
+  .zad-circle {
+    @include circleMixin(1, mastery);
+    top: calc(var(--scale) * 0.5);
+    left: calc(var(--scale) * 0.5);
+    align-items: center;
+    display: flex;
+    justify-content: center;
+  }
+
+  .label {
+    font-family: "Open Sans", sans-serif;
+    max-width: 150px;
+    font-size: 16px;
+  }
+
+  .item-card {
+    width: 300px;
+    height: 100px;
+    border-radius: 20px 20px 20px 20px;
+    background-color: lightgray;
+    margin: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-order: 1;
+    box-shadow: 2px 2px 5px var(--text-color);
+  }
+
+  /* new styling for arrows on page 2 */
+  #problem-page-wrapper .arrow {
+    background-color: blue;
+    width: 3px;
+    opacity: 0.3; /* make the arrows translucent */
+  }
+
+  #problem-page-wrapper .arrow::before {
+    border-bottom-color: blue;
+    border: 10px solid transparent;
+    border-bottom: 12px solid blue;
+    opacity: 1; /* make the arrows translucent */
+  }
+
+  .card-header {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 10px;
+    font-family: "Open Sans Condensed", sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--text-color);;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .card-table {
+    display: flex;
+    flex-direction: column;
+    font-family: "Open Sans Condensed", sans-serif;
+    font-size: 18px;
+    color: var(--font-color);
+    background-color: var(--table-background);
+    text-align: center;
+    width: 250px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    box-shadow: 2px 2px 5px #bbb;
+    margin-bottom: 10px;
+  }
+
+  .card-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    width: 250px;
+  }
+
+  .card-cell {
+    font-size: 12px;
+    text-align: center;
+    width: 50px;
+  }
+
+  .card-cell:hover {
+    background-color: #f2f2f2;
+  }
+
+  .nav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: lightgray;
+    width: 100vw;
+    padding: 10px 0;
+    box-sizing: border-box;
+    margin: 0;
+    font-family: Open Sans Condensed, sans-serif;
+    font-size: 28px;
+    font-weight: lighter;
+    color: var(--text-color);
+  }
+
+  .header-student {
+    text-align: center;
+    flex: 1;
+    cursor: pointer;
+  }
+
+  .button-right {
+    text-align: right;
+  }
+
+  .button-left {
+    text-align: left;
+  }
+
+  .button {
+    padding: 10px;
+  }
+
+  .dropdown {
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translate(-50%, 0);
+    min-width: 300px;
+    width: 33.33%;
+    background-color: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    overflow-x: hidden;
+    max-height: 600px;
+    overflow-y: scroll;
+    background-color: white;
+    border: 1px solid gray;
+    z-index: 2;
+  }
+
+  .dropdown-item {
+    padding: 10px;
+    display: block;
+    text-align: center;
+  }
+
+  .dropdown-item-selected {
+    background-color: lightgray;
+  }
+}
+
+
+/* Problem page view */
+
+#problem-page-wrapper {
+  body {
+    /*font-family: Lato;*/
+  }
+
+  .card {
+    background-color: #f2f2f2;
+    border: 1px solid #ccc;
+    padding: 10px;
+  }
+
+  .problem-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-gap: 10px;
+  }
+
+  .scaffold-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-gap: 10px;
+  }
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 0.3fr 1fr;
+    grid-gap: 10px;
+  }
+  .problem-container, .scaffold-container {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    border: 1px solid black;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 10px;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li {
+    display: inline-block;
+    margin-right: 5px;
+  }
+
+  .pie-chart {
+    width: 100px;
+    height: 100px;
+  }
+
+  .initials-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+    padding: 10px;
+    height: 60px;
+  }
+
+  .student-initials {
+    width: 40px;
+    height: 40px;
+    padding: 3px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 5px;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+
+  .background-canvas {
+    position: fixed;
+    z-index: -1;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .card.scaffold {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid black;
+  }
+
+  .card.scaffold h3 {
+    margin: 0 0 8px 16px;
+  }
+
+  .card.scaffold p {
+    margin: 0 0 16px 16px;
+  }
+
+  .card.scaffold > .target-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    padding: 10px;
+    width: 40px;
+    height: 40px;
+    margin-right: 16px;
+  }
+}
+

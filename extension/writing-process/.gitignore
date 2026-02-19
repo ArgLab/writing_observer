@@ -1,0 +1,5 @@
+dist/
+node_modules/
+**/*.bundle.js*
+public/
+release.zip

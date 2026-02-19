@@ -1,0 +1,40 @@
+aiofiles
+aiohttp
+aiohttp_cors
+aiohttp_session
+aiohttp_wsgi
+asyncio_redis   # pubsub
+asyncpg         # used in prototypes
+cookiecutter
+cryptography
+dash
+dash_renderjson
+docopt
+dash-bootstrap-components
+tsvx @ git+https://github.com/pmitros/tsvx.git@09bf7f33107f66413d929075a8b54c36ca581dae#egg=tsvx
+loremipsum @ git+https://github.com/testlabauto/loremipsum.git@b7bd71a6651207ef88993045cd755f20747f2a1e#egg=loremipsum
+ipython
+ipykernel
+jsonschema
+pyjwt
+lxml    # pubsub
+names
+notebook
+numpy
+pandas
+pathvalidate
+pmss
+psutil
+py-bcrypt
+pycodestyle
+pylint
+pytest
+pyyaml
+recordclass
+redis
+slixmpp     # pubsub
+svgwrite
+uvloop
+watchdog
+
+gitserve @ git+https://github.com/ArgLab/writing_observer.git#subdirectory=gitserve

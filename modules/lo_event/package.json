@@ -1,0 +1,67 @@
+{
+  "name": "lo_event",
+  "version": "0.0.3",
+  "description": "Event logging library for the Learning Observer",
+  "main": "lo_event/lo_event.js",
+  "scripts": {
+    "prebuild": "./lo_cli.js build",
+    "test": "jasmine \"tests/*.test.js\"",
+    "test-verbose": "jasmine --verbose \"tests/*.test.js\"",
+    "browser": "parcel examples/*.html --open",
+    "clean": "rm -Rf .cache/ dist/ .parcel-cache/ lo_event-*.tgz"
+  },
+  "bin": {
+    "lo_cli": "lo_cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArgLab/writing_observer.git"
+  },
+  "author": "Piotr Mitros",
+  "license": "SEE LICENSE IN license.txt",
+  "bugs": {
+    "url": "https://github.com/ArgLab/writing_observer/issues"
+  },
+  "homepage": "https://github.com/ArgLab/writing_observer#readme",
+  "type": "module",
+  "dependencies": {
+    "aws-sdk": "^2.1614.0",
+    "debounce": "^2.2.0",
+    "http-server": "^14.1.1",
+    "indexeddb-js": "^0.0.14",
+    "jasmine": "^5.1.0",
+    "lodash": "^4.17.21",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "redux": "^5.0.1",
+    "redux-state-sync": "^3.1.4",
+    "redux-thunk": "^3.1.0",
+    "sqlite3": "^5.1.6",
+    "uuid": "^10.0.0",
+    "ws": "^8.14.2",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.24.5",
+    "@babel/core": "^7.24.5",
+    "@babel/preset-env": "^7.24.5",
+    "@babel/preset-react": "^7.24.7",
+    "assert": "^2.1.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.0",
+    "events": "^3.3.0",
+    "mustache": "^4.2.0",
+    "os-browserify": "^0.3.0",
+    "parcel": "^2.12.0",
+    "path-browserify": "^1.0.1",
+    "process": "^0.11.10",
+    "querystring-es3": "^0.2.1",
+    "stream-browserify": "^3.0.0",
+    "url": "^0.11.3",
+    "util": "^0.12.5",
+    "vm-browserify": "^1.1.2"
+  },
+  "browser": {
+    "fs": false
+  }
+}

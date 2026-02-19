@@ -1,0 +1,11 @@
+textarea.large-input {
+  width: 100%;
+  height: 150px;
+  margin-bottom: 10px;
+}
+
+textarea.compact-input {
+  width: 100%;
+  height: 75px;
+  margin-bottom: 10px;
+}

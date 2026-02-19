@@ -1,0 +1,19 @@
+# This is a template YAML file of authorized admins.
+#
+# Each line contains one teacher:
+#
+# {
+#    "vsweeny@polk.apsd.us": {"google_id": "1234567890"},
+#    "mfornz@polk.apsd.us": {"google_id": "1234567891"},
+#    "jlee@polk.apsd.us": {"google_id": "1234567891"}
+# }
+#
+# This should be the official Google Classroom email address, and the
+# Google ID of the teacher.
+#
+# The first time this application is run, this template will be used
+# to create a admins.yaml file. You should not edit this one, but
+# that one.
+
+{
+}

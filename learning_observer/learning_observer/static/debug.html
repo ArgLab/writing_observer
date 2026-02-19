@@ -1,0 +1,60 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <script src="/static/3rd_party/d3.v5.min.js"></script>
+    <script src="/common/dashboard.js"></script>
+    <script data-main="/static/debug.js" src="/static/3rd_party/require.js"></script>
+
+    <!-- Our stylesheet / CSS framework is Bulma, for now--> 
+    <link rel="stylesheet" href="/static/3rd_party/bulma.min.css"/>
+    <link rel="stylesheet" href="/static/3rd_party/bulma-tooltip-min.css"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8">
+    <title> Dashboard Debugger </title>
+    <!--link rel="stylesheet" href="da.css"/-->
+  </head>
+  <body>
+    <div class="main">
+    <!-- Top navigation bar -->
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+      <div class="navbar-brand">
+	<a class="navbar-item" href="/">
+	  <img src="/static/media/ETS_Logo.svg" width="30" height="22">
+	</a>
+	
+	<a role="button" class="navbar-burger burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
+	  <span aria-hidden="true"></span>
+	  <span aria-hidden="true"></span>
+	  <span aria-hidden="true"></span>
+	</a>
+      </div>
+      
+      <div class="navbar-menu main-navbar-menu">
+	<!-- Replaced once page loads. Unique identifier main-navbar-menu. -->
+      </div>
+    </nav>
+
+    <!-- Main page body -->
+    <section class="section main-page">
+      <p> This is a test page. We can write a JSON key, and monitor a dashboard </p>
+      <p> It is not designed to be robust. </p>
+      <textarea id="query_string" class="textarea" placeholder='{"module": "da_timeline", "course": "12345", "student": "bob"}' rows="10"></textarea>
+      <button id="query_button" class="Query">Query</button>
+      <textarea id="query_response" class="textarea" placeholder="Bob's response" rows="10"></textarea>
+    </section>
+    <footer class="footer">
+      <div class="content has-text-centered">
+	<p>
+	  <strong>Learning Observer</strong>
+	  by <a href="http://mitros.org/p">Piotr Mitros</a>. Copyright
+	  (c) 2020, 2021. Educational Testing
+	  Service. The <a href="https://github.com/ETS-Next-Gen/writing_analysis">source
+	  code</a> is available 
+	  under <a href="https://www.gnu.org/licenses/agpl-3.0.en.html">the
+	  AGPLv3 license</a> on <a href="https://github.com/ArgLab/writing_observer">github</a>.
+	</p>
+      </div>
+    </footer>
+    </div>
+  </body>
+</html>

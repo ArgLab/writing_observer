@@ -1,0 +1,19 @@
+{
+  "cookiecutter": {
+    "project_name": "Test Template Module",
+    "project_slug": "test_template_module",
+    "project_hyphenated": "test-template-module",
+    "project_short_description": "Learning Observer Cookiecutter Test Module.",
+    "reducer": "student_event_counter",
+    "_template": "lo_template_module",
+    "_repo_dir": "lo_template_module",
+    "_checkout": null
+  },
+  "_cookiecutter": {
+    "project_name": "Learning Observer Cookiecutter Test Module.",
+    "project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '_') }}",
+    "project_hyphenated": "{{ cookiecutter.project_slug.replace('_', '-') }}",
+    "project_short_description": "Learning Observer Cookiecutter Test Module.",
+    "reducer": "student_event_counter"
+  }
+}

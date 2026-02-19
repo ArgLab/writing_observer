@@ -1,0 +1,11 @@
+{
+    "appName": {
+        "message": "writing-process"
+    },
+    "appShortName": {
+        "message": "writing-process"
+    },
+    "appDescription": {
+        "message": "Tracks writing in Google Docs, and provides nifty insights to you and your teachers!"
+    }
+}

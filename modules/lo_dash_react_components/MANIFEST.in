@@ -1,0 +1,13 @@
+include lo_dash_react_components/lo_dash_react_components.min.js
+include lo_dash_react_components/lo_dash_react_components.min.js.map
+include lo_dash_react_components/async-*.js
+include lo_dash_react_components/async-*.js.map
+include lo_dash_react_components/*-shared.js
+include lo_dash_react_components/*-shared.js.map
+include lo_dash_react_components/metadata.json
+include lo_dash_react_components/package-info.json
+recursive-include lo_dash_react_components/css *.css
+include README.md
+include LICENSE
+include package.json
+include requirements.txt

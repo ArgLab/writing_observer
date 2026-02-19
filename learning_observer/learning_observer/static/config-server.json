@@ -1,0 +1,10 @@
+{
+    "overview": ["This is a client-side configuration file. It's nice if we can do",
+		 "client-side development without a server. Our goal is that the system",
+		 "should approximately work grabbing dummy files served as static files",
+		 "without a server, and grabbing real data with a server. This file define",
+		 "paths. If served as a static directory, it will grab config.json instead",
+		 "of this file. If served from a server, the client will grab this file instead."
+		],
+    "mode": "server"
+}

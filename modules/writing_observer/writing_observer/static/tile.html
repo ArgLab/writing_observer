@@ -1,0 +1,86 @@
+<!-- This a template for one card in Writing Observer -->
+<div class="tile is-parent">
+  <article class="tile is-child card" style="display:flex; flex-direction:column; justify-content:space-between">
+      <div class="card-header">
+        <div class="card-header-title level">
+          <div class="level-left wo-tile-name">[Loading]</div>
+            <div class="level-right">
+              <figure class="image is-32x32"
+                      data-tooltip="Student photo, if configured in their Google profile">
+                <img class="wo-tile-photo" src="/static/media/32x32.png">
+              </figure>
+          </div>
+        </div>
+      </div>
+      <div class="card-content" style="padding-top:7px">
+        <div class="wo-summary-stats level"
+             style="margin:0; border-bottom:1px;">
+
+          <div class="level-item"
+               data-tooltip="Number of characters of student text">
+            <!--svg preserveAspectRatio="none" viewBox="0 0 200 30" class="svg-content"
+                style="border: 1px solid lightgray; width: 100%; left: 0%; height:10px;position:absolute; z-index:0;">
+                <rect x="0" y="0" width="200" height="15" fill="#ccccff" class="wo-character-count-bar">
+                </rect>
+            </svg-->
+            <div>
+              <p class="wo-tile-character-count has-text-centered z-index:1">
+                <span style="z-index:1">N/A</span>
+              </p>
+              <p class="heading wo-desc-header has-text-centered">
+                Count
+              </p>
+            </div>
+          </div>
+
+          <div class="level-item"
+               data-tooltip="Approximate time spent writing with Writing Obeserver">
+            <!--svg preserveAspectRatio="none" viewBox="0 0 60 10" class="svg-content"
+                 style="border: 1px solid lightgray; width:20%; height:10px;position:absolute; z-index:0;">
+              <rect x="0" y="0" width="30" height="10" fill="#ccccff" class="wo-time-on-task-bar"></rect>
+            </svg-->
+              <div>
+              <p class="wo-tile-time-on-task has-text-centered z-index:1">
+                <span style="z-index:1">N/A</span>
+              </p>
+              <p class="heading wo-desc-header has-text-centered">
+                Time
+              </p>
+            </div>
+          </div>
+
+          <div class="level-item" data-tooltip="Time since last keystroke">
+            <!--svg preserveAspectRatio="none" viewBox="0 0 60 10" class="svg-content"
+                 style="border: 1px solid lightgray; width:20%; height:10px;position:absolute; z-index:0;">
+              <rect x="0" y="0" width="30" height="10" fill="#ccccff"></rect>
+            </svg-->
+              <div>
+              <p class="wo-tile-idle-time  has-text-centered z-index:1">
+                <span style="z-index:1">N/A</span>
+              </p>
+              <p class="heading wo-desc-header has-text-centered">
+                Idle
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="wo-tile-typing" data-tooltip="Most recently edited section of student text">
+          <p><span class="wo-typing-text"></span>[Loading]</p>
+        </div>
+      </div>
+      <div class="card-footer level" style="margin-top:auto">
+          <div class="level-item">
+            <a class="wo-tile-email" href="mailto:" data-tooltip="Email student">
+              <span class="icon"> <i class="fas fa-envelope"></i> </span>
+            </a>
+          </div>
+          <div class="level-item">
+            <a target="_blank" rel="noopener noreferrer"
+               href="https://docs.google.com" class="wo-tile-doc"
+               data-tooltip="View document in Google Docs">
+              <span class="icon"> <i class="fas fa-expand"></i></span>
+            </a>
+        </div>
+      </div>
+  </article>
+</div>

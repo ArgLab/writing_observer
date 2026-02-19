@@ -1,0 +1,4 @@
+{
+  "watch": ["src/lib/components", "src/*.scss", "src/*.css", "src/*.js", "usage.py"],
+  "exec": "npm run build && python usage.py"
+}

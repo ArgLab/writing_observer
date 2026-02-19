@@ -1,0 +1,14 @@
+.LOCollapse {
+    height: auto;
+    .contents {
+        overflow: hidden;
+        max-height: 0;
+        transform-origin: top;
+        transform: scaleY(0);
+        transition: transform 0.3s ease-in-out, max-height 0.3s ease-in-out;
+    }
+    .contents.expanded {
+        max-height: 1000px; /* This should be larger than the content will ever be */
+        transform: scaleY(1);
+    }
+}

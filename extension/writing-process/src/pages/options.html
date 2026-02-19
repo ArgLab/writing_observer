@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+  </head>
+
+  <body>
+    <h1> Options for debugging </h1>
+
+    <p> Server lets us tweak where we send data. User tag lets us
+    tweak user ID (so we can e.g. pretend to be two users without
+    multiple Google accounts). Teacher tag lets us tweak who we route
+    messages to.
+
+    <p>Server: <b class="process_server value-display">no value found</b></p>
+    <p>User tag: <b class="user_tag value-display">no value found</b></p>
+    <p>Teacher tag: <b class="teacher_tag value-display">no value found</b></p>
+    <form>
+      <label>Server</label>
+      <input type="text" class="process_server input-text" >
+      <button type="button" class="process_server save-button">Save</button>
+      <button type="button" class="process_server remove-button">Remove</button>
+      <br/>
+      <label>Student tag</label>
+      <input type="text" class="user_tag input-text" >
+      <button type="button" class="user_tag save-button">Save</button>
+      <button type="button" class="user_tag remove-button">Remove</button>
+      <br/>
+      <label>Teacher tag</label>
+      <input type="text" class="teacher_tag input-text" >
+      <button type="button" class="teacher_tag save-button">Save</button>
+      <button type="button" class="teacher_tag remove-button">Remove</button>
+      <br>
+      <label>Unique ID</label>
+      <input type="text" class="unique_id input-text" >
+      <button type="button" class="unique_id save-button">Save</button>
+      <button type="button" class="unique_id remove-button">Remove</button>
+    </form>
+    <script src="options.js"></script>
+  </body>
+</html>

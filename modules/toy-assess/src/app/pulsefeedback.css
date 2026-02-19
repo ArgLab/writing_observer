@@ -1,0 +1,100 @@
+/*
+ * This is a pulse animation used to subtly highlight feedback. It can
+ * flash red for multiple incorrect answers.
+ */
+
+@keyframes flash-red-1 {
+    0% {
+	background-color: white;
+    }
+    50% {
+	background-color: hsl(347, 90%, 96%);
+    }
+    100% {
+	background-color: white;
+    }
+}
+
+@keyframes flash-red-2 {
+    0% {
+	background-color: white;
+    }
+    50% {
+	background-color: hsl(347, 90%, 96%);
+    }
+    100% {
+	background-color: white;
+    }
+}
+
+@keyframes flash-green-1 {
+    0% {
+	background-color: white;
+    }
+    50% {
+	background-color: hsl(142, 52%, 96%);
+    }
+    100% {
+	background-color: white;
+    }
+}
+
+@keyframes flash-green-2 {
+    0% {
+	background-color: white;
+    }
+    50% {
+	background-color: hsl(142, 52%, 96%);
+    }
+    100% {
+	background-color: white;
+    }
+}
+
+@keyframes flash-yellow-1 {
+    0% {
+	background-color: white;
+    }
+    50% {
+	background-color: hsl(48, 100%, 96%);
+    }
+    100% {
+	background-color: white;
+    }
+}
+
+@keyframes flash-yellow-2 {
+    0% {
+	background-color: white;
+    }
+    50% {
+	background-color: hsl(48, 100%, 96%);
+    }
+    100% {
+	background-color: white;
+    }
+}
+
+.pulse-incorrect-1 {
+    animation:flash-red-1 0.25s;
+}
+
+.pulse-incorrect-2 {
+    animation:flash-red-2 0.25s;
+}
+
+.pulse-correct-1 {
+    animation:flash-green-1 0.25s;
+}
+
+.pulse-correct-2 {
+    animation:flash-green-2 0.25s;
+}
+
+.pulse-invalid-1 {
+    animation:flash-yellow-1 0.25s;
+}
+
+.pulse-invalid-2 {
+    animation:flash-yellow-2 0.25s;
+}

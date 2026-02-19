@@ -1,0 +1,7 @@
+cd
+echo . /usr/share/virtualenvwrapper/virtualenvwrapper.sh >> ~/.profile
+source ~/.profile; mkvirtualenv learning_observer
+echo workon learning_observer >> ~/.profile
+source ~/.profile; pip install --upgrade pip
+source ~/.profile; cd writing_observer/ ; pip install -r requirements.txt
+source ~/.profile; cd ~/writing_observer/learning_observer/; python setup.py develop

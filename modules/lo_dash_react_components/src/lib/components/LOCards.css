@@ -1,0 +1,24 @@
+.flow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.lo-card {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0 8px;
+  min-width: 200px;
+  text-align: center;
+}
+
+.arrow {
+  position: relative;
+  width: 0;
+  height: 0;
+  margin: 0 4px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid #ccc;
+}

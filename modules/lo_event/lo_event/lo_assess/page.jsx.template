@@ -1,0 +1,14 @@
+{{{ header }}}
+
+'use client';
+// @refresh reset
+
+import React from 'react';
+
+{{{ imports }}}
+
+export default function Home( { children } ) {
+  return (
+    {{ xml }}
+  );
+};

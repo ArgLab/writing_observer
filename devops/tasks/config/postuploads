@@ -1,0 +1,10 @@
+sudo hostnamectl set-hostname {hostname}
+sudo rm -f /etc/nginx/sites-available/default
+sudo rm -f /etc/nginx/sites-enabled/default
+if [ -f /etc/nginx/sites-available/{hostname} ]; then sudo ln -f /etc/nginx/sites-available/{hostname} /etc/nginx/sites-enabled/{hostname}; else echo "WARNING: Failed to make symlink in /etc/nginx/sites-available (config/postupload)"; fi
+
+sudo chown -R ubuntu:ubuntu /home/ubuntu/writing_observer
+sudo systemctl daemon-reload
+sudo service learning_observer stop
+sudo service learning_observer start
+sudo service nginx restart

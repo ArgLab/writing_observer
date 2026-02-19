@@ -1,0 +1,6 @@
+- name: Provision writing analysis server
+  hosts: localhost
+  connection: local
+  tasks:
+  - include: tasks/writing-apt.yaml
+

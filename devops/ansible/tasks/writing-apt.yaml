@@ -1,0 +1,57 @@
+- apt: upgrade=dist update_cache=yes
+
+- name: Basic utils
+  apt: name={{ item }} 
+  with_items:
+  - curl
+  - emacs
+  - git
+  - git-core
+  - links
+  - lynx
+  - mosh
+  - nmap
+  - whois
+  - screen
+  - wipe
+  - build-essential
+  - net-tools
+
+# We don't need all of this per se, but it's convenient. If nothing
+# else, it gives prereqs for `pip`
+- name: Python
+  apt: name={{ item }} 
+  with_items:
+  - ipython3
+  - libxml2-dev
+  - libxslt1-dev
+  - python3-boto
+  - python3-bson
+  - python3-dev
+  - python3-matplotlib
+  - python3-numpy
+  - python3-pandas
+  - python3-pip
+  - python3-scipy
+  - python3-setuptools
+  - python3-sklearn
+  - virtualenvwrapper
+  - libjpeg-dev
+  - python3-opencv
+  - python3-virtualenv
+  - python3-aiohttp
+  - python3-aiohttp-cors
+  - python3-tornado
+  - python3-yaml
+  - python3-asyncpg
+  - python3-bcrypt
+
+- name: Server
+  apt: name={{ item }} 
+  with_items:
+  - redis
+  - nginx
+  - certbot
+  - apache2-utils
+  - fcgiwrap
+  - python3-certbot-nginx

@@ -1,0 +1,17 @@
+.LONameTag {
+    img.name-tag-photo {
+        border-radius: 50%;
+        width: 42px;
+    }
+    span.name-tag-photo {
+        font-family: monospace;
+        text-align: center;
+        background-color: white;
+        padding: 0.25rem;
+        border-radius: 50%;
+        border: 1px solid lightgray;
+    }
+    .name-tag-name {
+        margin-left: 0.5em;
+    }
+}
