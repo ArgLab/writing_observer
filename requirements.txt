@@ -37,4 +37,4 @@ svgwrite
 uvloop
 watchdog
 
-gitserve @ git+https://github.com/ETS-Next-Gen/writing_observer.git#subdirectory=gitserve
+gitserve @ git+https://github.com/ArgLab/writing_observer.git#subdirectory=gitserve

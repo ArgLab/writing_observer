@@ -22,13 +22,13 @@ Have two terminal windows or tabs open. We will run the server in one and use th
 1. Open a terminal and clone the repository:
 
    ```bash
-   git clone https://github.com/ETS-Next-Gen/writing_observer.git lo_tutorial
+   git clone https://github.com/ArgLab/writing_observer.git lo_tutorial
    ```
 
    If you have an SSH key configured with GitHub, you can use:
 
    ```bash
-   git clone git@github.com:ETS-Next-Gen/writing_observer.git lo_tutorial
+   git clone git@github.com:ArgLab/writing_observer.git lo_tutorial
    ```
 
 2. Change into the new directory:

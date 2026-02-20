@@ -25,7 +25,7 @@ In `module.py`, you see this line:
 EXECUTION_DAG = learning_observer.communication_protocol.util.generate_base_dag_for_student_reducer('student_event_counter', 'my_event_module')
 ```
 
-This is shorthand for a common query which JOINs the class roster with the output of the reducers. The Python code for the query itself is [here](https://github.com/ETS-Next-Gen/writing_observer/blob/berickson/workshop/learning_observer/learning_observer/communication_protocol/util.py#L58), but the jist of the code is:
+This is shorthand for a common query which JOINs the class roster with the output of the reducers. The Python code for the query itself is [here](https://github.com/ArgLab/writing_observer/blob/berickson/workshop/learning_observer/learning_observer/communication_protocol/util.py#L58), but the jist of the code is:
 
 ```python
 'roster': course_roster(runtime=q.parameter('runtime'), course_id=q.parameter("course_id", required=True)),

@@ -79,12 +79,12 @@ THIRD_PARTY = {
         "62618d4bff6e51fafa25d41cb59bd97f3ebd72fd94ebd09a52c17c4c23fdca3962b"
     },
     "showdown.js": {      # Default markup library
-        "url": "https://rawgit.com/showdownjs/showdown/1.9.1/dist/showdown.js",
+        "url": "https://cdn.jsdelivr.net/gh/showdownjs/showdown@1.9.1/dist/showdown.js",
         "hash": "4fe14f17c2a1d0275d44e06d7e68d2b177779196c6d0c562d082eb5435eec"
         "4e710a625be524767aef3d9a1f6a5b88f912ddd71821f4a9df12ff7dd66d6fbb3c9"
     },
     "showdown.js.map": {  # Part of above
-        "url": "https://rawgit.com/showdownjs/showdown/1.9.1/dist/showdown.js.map",
+        "url": "https://cdn.jsdelivr.net/gh/showdownjs/showdown@1.9.1/dist/showdown.js.map",
         "hash": "74690aa3cea07fd075942ba9e98cf7297752994b93930acb3a1baa2d3042a"
         "62b5523d3da83177f63e6c02fe2a09c8414af9e1774dad892a303e15a86dbeb29ba"
     },
@@ -115,7 +115,7 @@ THIRD_PARTY = {
 STATIC_FILE_GIT_REPOS = {
     # 'writing_observer': {
     #     # Where we can grab a copy of the repo, if not already on the system
-    #     'url': 'https://github.com/ETS-Next-Gen/writing_observer.git',
+    #     'url': 'https://github.com/ArgLab/writing_observer.git',
     #     # Where the static files in the repo lie
     #     'prefix': 'learning_observer/learning_observer/static',
     #     # Branches we serve. This can either be a whitelist (e.g. which ones
