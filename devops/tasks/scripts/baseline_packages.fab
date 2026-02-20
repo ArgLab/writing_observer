@@ -1,4 +1,4 @@
 cd
 sudo apt-get -y install git ansible awscli
-git clone https://github.com/ETS-Next-Gen/writing_observer.git
+git clone https://github.com/ArgLab/writing_observer.git
 cd writing_observer/devops/ansible ; sudo ansible-playbook local.yaml

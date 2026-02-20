@@ -365,7 +365,7 @@ THIRD_PARTY = {
 STATIC_FILE_GIT_REPOS = {
     'writing_observer': {
         # Where we can grab a copy of the repo, if not already on the system
-        'url': 'https://github.com/ETS-Next-Gen/writing_observer.git',
+        'url': 'https://github.com/ArgLab/writing_observer.git',
         # Where the static files in the repo lie
         'prefix': 'modules/writing_observer/writing_observer/static',
         # Branches we serve. This can either be a whitelist (e.g. which ones

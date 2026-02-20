@@ -48,13 +48,13 @@ If you don't have a way of managing Python virtual environments, or would prefer
 First make sure you clone the repository:
 
 ```bash
-git clone https://github.com/ETS-Next-Gen/writing_observer.git lo_workshop
+git clone https://github.com/ArgLab/writing_observer.git lo_workshop
 ```
 
 **or**, if you have a github account properly configured with ssh:
 
 ```bash
-git clone git@github.com:ETS-Next-Gen/writing_observer.git lo_workshop
+git clone git@github.com:ArgLab/writing_observer.git lo_workshop
 ```
 
 ```bash
@@ -173,7 +173,7 @@ This will generate events for 10 students typing a set of loremipsum texts and s
 
 You can look at the format of these specific events in the `/learning_observer/learning_observer/logs/` directory. In the test system, we simply put events into log files, but we are gradually moving towards a more sophisticated, open-science, family-rights oriented data store (shown at the bottom of [this document](system_design.md). This is theoretically interesting, since it gives a cryptographically-verifiable way to audit what data was created and what analyses ran.
 
-There are several good standards for [event formats](events.md), and to integrate learning data, we will need to support them all. Most of these have converged on a line of JSON per event, but the specifics are format-specific. We are including [some code](https://github.com/ETS-Next-Gen/writing_observer/blob/master/modules/lo_event/lo_event/xapi.cjs) to help support the major ones. However, the events here are somewhat bound to how Google Docs thinks about documents.
+There are several good standards for [event formats](events.md), and to integrate learning data, we will need to support them all. Most of these have converged on a line of JSON per event, but the specifics are format-specific. We are including [some code](https://github.com/ArgLab/writing_observer/blob/master/modules/lo_event/lo_event/xapi.cjs) to help support the major ones. However, the events here are somewhat bound to how Google Docs thinks about documents.
 
 ## module.py
 
@@ -251,7 +251,7 @@ In `module.py`, you see this line:
 EXECUTION_DAG = learning_observer.communication_protocol.util.generate_base_dag_for_student_reducer('student_event_counter', 'my_event_module')
 ```
 
-This is shorthand for a common query which JOINs the class roster with the output of the reducers. The Python code for the query itself is [here](https://github.com/ETS-Next-Gen/writing_observer/blob/berickson/workshop/learning_observer/learning_observer/communication_protocol/util.py#L58), but the jist of the code is:
+This is shorthand for a common query which JOINs the class roster with the output of the reducers. The Python code for the query itself is [here](https://github.com/ArgLab/writing_observer/blob/berickson/workshop/learning_observer/learning_observer/communication_protocol/util.py#L58), but the jist of the code is:
 
 ```python
 'roster': course_roster(runtime=q.parameter('runtime'), course_id=q.parameter("course_id", required=True)),
@@ -326,11 +326,11 @@ Once set up, the development workflow here is rather fast, since the UX updates 
 
 ### `lo_event`
 
-Our data streaming library is [lo_event](https://github.com/ETS-Next-Gen/writing_observer/tree/master/modules/lo_event). This library is designed to stream events (typically) from a JavaScript client, and handles all of the complexity of things like persistance, queuing, and retries for you. Cookiecutter cde, but it should save you a bunch of time.
+Our data streaming library is [lo_event](https://github.com/ArgLab/writing_observer/tree/master/modules/lo_event). This library is designed to stream events (typically) from a JavaScript client, and handles all of the complexity of things like persistance, queuing, and retries for you. Cookiecutter cde, but it should save you a bunch of time.
 
 ### `lo_assess`
 
-Much more interesting, in development (and probably in need of renaming) is [`lo_assess`](https://github.com/ETS-Next-Gen/writing_observer/tree/pmitros/loevent-v2/modules/lo_event/lo_event/lo_assess).
+Much more interesting, in development (and probably in need of renaming) is [`lo_assess`](https://github.com/ArgLab/writing_observer/tree/pmitros/loevent-v2/modules/lo_event/lo_event/lo_assess).
 
 There is an XML format (based on edX OLX, which is in turn based on LON-CAPA XML) for creating interactives.
 

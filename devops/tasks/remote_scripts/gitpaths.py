@@ -10,7 +10,7 @@ def gitpath_to_name(packagepath):
     '''
     Convert a git path to the name of the repo. For example:
 
-    `https://github.com/ETS-Next-Gen/writing_observer.git` ==> `writing_observer`
+    `https://github.com/ArgLab/writing_observer.git` ==> `writing_observer`
     '''
     package = os.path.split(packagepath)[1]
     if package.endswith(".git"):
