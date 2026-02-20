@@ -22,3 +22,10 @@
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
 }
+
+.modal-backdrop.show {
+    backdrop-filter: blur(20px) saturate(0.5);
+    -webkit-backdrop-filter: blur(20px) saturate(0.5);
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    opacity: 1 !important;
+}
