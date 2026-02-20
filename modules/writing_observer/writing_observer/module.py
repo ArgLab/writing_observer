@@ -270,12 +270,12 @@ REDUCERS = [
         'function': writing_observer.writing_analysis.gdoc_scope_time_on_task,
         'default': {'saved_ts': 0}
     },
-    # {
-    #     'context': "org.mitros.writing_analytics",
-    #     'scope': writing_observer.writing_analysis.gdoc_tab_scope,
-    #     'function': writing_observer.writing_analysis.gdoc_tab_scope_time_on_task,
-    #     'default': {'saved_ts': 0}
-    # },
+    {
+        'context': "org.mitros.writing_analytics",
+        'scope': writing_observer.writing_analysis.gdoc_tab_scope,
+        'function': writing_observer.writing_analysis.gdoc_tab_scope_time_on_task,
+        'default': {'saved_ts': 0}
+    },
     {
         'context': "org.mitros.writing_analytics",
         'scope': writing_observer.writing_analysis.gdoc_scope,
