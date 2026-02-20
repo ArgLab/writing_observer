@@ -8,15 +8,6 @@ if (!window.dash_clientside) {
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/3rd_party/pdf.worker.min.js';
 
-// const DASH_HTML_COMPONENTS = 'dash_html_components';
-// const DASH_CORE_COMPONENTS = 'dash_core_components';
-// const DASH_BOOTSTRAP_COMPONENTS = 'dash_bootstrap_components';
-// const LO_DASH_REACT_COMPONENTS = 'lo_dash_react_components';
-
-// function createDashComponent (namespace, type, props) {
-//   return { namespace, type, props };
-// }
-
 function fetchSelectedItemsFromOptions (value, options, type) {
   return options.reduce(function (filtered, option) {
     if (value?.[option.id]?.[type]?.value) {
@@ -443,7 +434,6 @@ window.dash_clientside.bulk_essay_feedback = {
         window.dash_clientside.no_update
       ];
     }
-    console.log('[applySettingsAndCloseModal] Applying settings');
     return [stagedSystemPrompt, docKwargs, false];
   },
 
@@ -816,7 +806,7 @@ window.dash_clientside.bulk_essay_feedback = {
   savePlaceholder: function (clicks, label, text, replacementId, tagStore) {
     if (clicks > 0) {
       const newStore = { ...tagStore };
-      if (!!replacementId & replacementId !== label) {
+      if (!!replacementId && replacementId !== label) {
         delete newStore[replacementId];
       }
       newStore[label] = text;

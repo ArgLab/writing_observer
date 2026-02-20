@@ -588,9 +588,8 @@ async def course_api(request):
     course_id = request.match_info['course_id']
     courses = await courselist(request)
     for course in courses:
-        if course['id'] != course_id:
-            continue
-        return aiohttp.web.json_response(course)
+        if course['id'] == course_id:
+            return aiohttp.web.json_response(course)
     return aiohttp.web.json_response({})
 
 

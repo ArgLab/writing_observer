@@ -342,7 +342,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
   computeAppliedHash: async function (appliedValue) {
     if (!appliedValue) { return ''; }
     const h = await hashObject(appliedValue);
-    console.log('[computeAppliedHash] computed hash:', h.substring(0, 12) + '...');
+    // console.log('[computeAppliedHash] computed hash:', h.substring(0, 12) + '...');
     return h;
   },
 
@@ -356,7 +356,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       if (!decodedParams.course_id) { return window.dash_clientside.no_update; }
 
       if (!appliedHash) {
-        console.log('[sendToLOConnection] No hash yet, skipping');
+        // console.log('[sendToLOConnection] No hash yet, skipping');
         return window.dash_clientside.no_update;
       }
 
@@ -373,7 +373,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
           kwargs: decodedParams
         }
       };
-      console.log('[sendToLOConnection] Sending with hash:', appliedHash.substring(0, 12) + '...');
+      // console.log('[sendToLOConnection] Sending with hash:', appliedHash.substring(0, 12) + '...');
       return JSON.stringify(outgoingMessage);
     }
     return window.dash_clientside.no_update;
@@ -392,7 +392,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
         window.dash_clientside.no_update
       ];
     }
-    console.log('[applyOptionsAndCloseModal] Applying staged options and doc source');
+    // console.log('[applyOptionsAndCloseModal] Applying staged options and doc source');
     return [stagedValue, docKwargs, false];
   },
 
@@ -411,7 +411,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       return window.dash_clientside.no_update;
     }
     const total = ids.length;
-    console.log('[updateCurrentOptionHash] Broadcasting hash to', total, 'tiles:', appliedHash.substring(0, 12) + '...');
+    // console.log('[updateCurrentOptionHash] Broadcasting hash to', total, 'tiles:', appliedHash.substring(0, 12) + '...');
     return Array(total).fill(appliedHash);
   },
 
@@ -430,7 +430,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
     const selectedHighlights = fetchSelectedItemsFromOptions(value, options, 'highlight');
     const selectedMetrics = fetchSelectedItemsFromOptions(value, options, 'metric');
 
-    console.log('[populateOutput] Using hash:', optionHash ? optionHash.substring(0, 12) + '...' : 'NONE');
+    // console.log('[populateOutput] Using hash:', optionHash ? optionHash.substring(0, 12) + '...' : 'NONE');
 
     for (const student in students) {
       const selectedDocument = students[student].doc_id || Object.keys(students[student].documents || {})[0] || '';
@@ -534,7 +534,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       }
     }
 
-    console.log(`[updateLoadingInformation] ${returnedResponses}/${totalStudents} responded for hash=${appliedHash.substring(0, 12)}...`);
+    // console.log(`[updateLoadingInformation] ${returnedResponses}/${totalStudents} responded for hash=${appliedHash.substring(0, 12)}...`);
 
     if (totalStudents === returnedResponses) {
       return noLoading;
