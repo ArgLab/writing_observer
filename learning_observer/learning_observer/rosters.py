@@ -360,7 +360,7 @@ def init():
     # Google, Canvas, and Schoology all use integrations instead of ajax when called
     elif roster_source in ["google_api"]:
         ajax = google_ajax
-    elif roster_source in ["canvas_api", 'schoology_api']:
+    elif roster_source in ["canvas_api", 'schoology']:
         pass
     elif roster_source in ["all"]:
         ajax = all_ajax
@@ -369,7 +369,7 @@ def init():
             "Settings file `roster_data` element should have `source` field\n"
             "set to either:\n"
             "  test        (retrieve from files courses.json and students.json)\n"
-            "  google_api | canvas_api | schoology_api  (retrieve roster data from an api)\n"
+            "  google_api | canvas_api | schoology  (retrieve roster data from an api)\n"
             "  filesystem  (retrieve roster data from file system hierarchy\n"
             "  all  (retrieve roster data as all students)"
         )
@@ -555,11 +555,42 @@ async def courseroster(request, course_id):
     return roster
 
 
+async def courseassignments(request, course_id):
+    '''Fetch all the assignments for a given course
+    '''
+    assignments = await run_additional_module_func(request, 'assignments', kwargs={'courseId': course_id})
+    if assignments is not None:
+        return assignments
+    return []
+
+
+async def courseassignment_assigned_docs(request, course_id, assignment_id):
+    '''
+    Fetch all assigned docs for a given assignment
+    '''
+    assigned_docs = await run_additional_module_func(request, 'assigned_docs', kwargs={'courseId': course_id, 'courseWorkId': assignment_id})
+    if assigned_docs is not None:
+        return assigned_docs
+    return []
+
+
 async def courselist_api(request):
     '''
     List all of the courses a teacher manages: Handler
     '''
     return aiohttp.web.json_response(await courselist(request))
+
+
+async def course_api(request):
+    '''
+    Fetch course information
+    '''
+    course_id = request.match_info['course_id']
+    courses = await courselist(request)
+    for course in courses:
+        if course['id'] == course_id:
+            return aiohttp.web.json_response(course)
+    return aiohttp.web.json_response({})
 
 
 async def courseroster_api(request):
@@ -568,3 +599,11 @@ async def courseroster_api(request):
     '''
     course_id = int(request.match_info['course_id'])
     return aiohttp.web.json_response(await courseroster(request, course_id))
+
+
+async def courseassignments_api(request):
+    '''
+    List all of the assignments in a course: Handler
+    '''
+    course_id = request.match_info['course_id']
+    return aiohttp.web.json_response(await courseassignments(request, course_id))

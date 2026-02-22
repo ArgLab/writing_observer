@@ -41,14 +41,19 @@ class LODocumentSourceSelectorAIO(dbc.Card):
             'subcomponent': 'timestamp_input',
             'aio_id': aio_id
         }
+        title_text_wrapper = lambda aio_id: {
+            'component': 'LODocumentSourceSelectorAIO',
+            'subcomponent': 'title_text_wrapper',
+            'aio_id': aio_id
+        }
+        title_text_input = lambda aio_id: {
+            'component': 'LODocumentSourceSelectorAIO',
+            'subcomponent': 'title_text_input',
+            'aio_id': aio_id
+        }
         kwargs_store = lambda aio_id: {
             'component': 'LODocumentSourceSelectorAIO',
             'subcomponent': 'kwargs_store',
-            'aio_id': aio_id
-        }
-        apply = lambda aio_id: {
-            'component': 'LODocumentSourceSelectorAIO',
-            'subcomponent': 'apply',
             'aio_id': aio_id
         }
 
@@ -65,7 +70,8 @@ class LODocumentSourceSelectorAIO(dbc.Card):
                 id=self.ids.source_selector(aio_id),
                 options={'latest': 'Latest Document',
                          'assignment': 'Assignment',
-                         'timestamp': 'Specific Time'},
+                         'timestamp': 'Specific Time',
+                         'title_text': 'Text in Title'},
                 inline=True,
                 value='latest'),
             html.Div('Additional Arguments'),
@@ -83,7 +89,13 @@ class LODocumentSourceSelectorAIO(dbc.Card):
                         value=datetime.datetime.now().strftime("%H:%M"))
                 ])
             ], id=self.ids.datetime_wrapper(aio_id)),
-            dbc.Button('Apply', id=self.ids.apply(aio_id), class_name='mt-1', n_clicks=0),
+            html.Div([
+                dbc.Input(
+                    id=self.ids.title_text_input(aio_id),
+                    type='text',
+                    placeholder='Enter text to match document titles'
+                )
+            ], id=self.ids.title_text_wrapper(aio_id)),
             dcc.Store(id=self.ids.kwargs_store(aio_id), data={'src': 'latest'})
         ])
         component = [
@@ -94,74 +106,79 @@ class LODocumentSourceSelectorAIO(dbc.Card):
 
     # Update data
     clientside_callback(
-        '''function (clicks, src, assignment, date, time) {
-            if (clicks === 0) { return window.dash_clientside.no_update; }
+        '''function (src, assignment, date, time, titleText) {
+            // if (clicks === 0) { return window.dash_clientside.no_update; }
             let kwargs = {};
             if (src === 'assignment') {
                 kwargs.assignment = assignment;
             } else if (src === 'timestamp') {
                 kwargs.requested_timestamp = new Date(`${date}T${time}`).getTime().toString()
+            } else if (src === 'title_text') {
+                kwargs.title_text = titleText;
             }
             return {src, kwargs};
         }
         ''',
         Output(ids.kwargs_store(MATCH), 'data'),
-        Input(ids.apply(MATCH), 'n_clicks'),
-        State(ids.source_selector(MATCH), 'value'),
-        State(ids.assignment_input(MATCH), 'value'),
-        State(ids.date_input(MATCH), 'date'),
-        State(ids.timestamp_input(MATCH), 'value'),
+        Input(ids.source_selector(MATCH), 'value'),
+        Input(ids.assignment_input(MATCH), 'value'),
+        Input(ids.date_input(MATCH), 'date'),
+        Input(ids.timestamp_input(MATCH), 'value'),
+        Input(ids.title_text_input(MATCH), 'value'),
     )
 
     clientside_callback(
         '''function (src) {
             if (src === 'assignment') {
-                return ['d-none', ''];
+                return ['d-none', '', 'd-none'];
             } else if (src === 'timestamp') {
-                return ['', 'd-none']
+                return ['', 'd-none', 'd-none']
+            } else if (src === 'title_text') {
+                return ['d-none', 'd-none', '']
             }
-            return ['d-none', 'd-none'];
+            return ['d-none', 'd-none', 'd-none'];
         }
         ''',
         Output(ids.datetime_wrapper(MATCH), 'className'),
         Output(ids.assignment_wrapper(MATCH), 'className'),
+        Output(ids.title_text_wrapper(MATCH), 'className'),
         Input(ids.source_selector(MATCH), 'value'),
     )
 
     clientside_callback(
-        '''async function (id, hash) {
-            if (hash.length === 0) { return window.dash_clientside.no_update; }
+        '''async function (id, hash, currentSource) {
+            const noUpdate = window.dash_clientside.no_update;
+            if (!hash || hash.length === 0) { return [noUpdate, noUpdate, noUpdate]; }
             const decoded = decode_string_dict(hash.slice(1));
-            if (!decoded.course_id) { return window.dash_clientside.no_update; }
-            const response = await fetch(`${window.location.protocol}//${window.location.hostname}:${window.location.port}/google/course_work/${decoded.course_id}`);
+            if (!decoded.course_id) { return [noUpdate, noUpdate, noUpdate]; }
+
+            const response = await fetch(`${window.location.protocol}//${window.location.hostname}:${window.location.port}/webapi/courseassignments/${decoded.course_id}`);
             const data = await response.json();
-            const options = data.courseWork.map(function (item) {
+            const assignmentOptions = data.map(function (item) {
                 return { label: item.title, value: item.id };
             });
-            return options;
+
+            const sourceOptions = [
+                { label: 'Latest Document', value: 'latest' },
+                { label: 'Specific Time', value: 'timestamp' },
+                { label: 'Text in Title', value: 'title_text' },
+            ];
+            if (assignmentOptions.length > 0) {
+                sourceOptions.splice(1, 0, { label: 'Assignment', value: 'assignment' });
+            }
+
+            let sourceValue = currentSource;
+            if (sourceValue === 'assignment' && assignmentOptions.length === 0) {
+                sourceValue = 'latest';
+            }
+
+            return [assignmentOptions, sourceOptions, sourceValue];
         }
         ''',
         Output(ids.assignment_input(MATCH), 'options'),
+        Output(ids.source_selector(MATCH), 'options'),
+        Output(ids.source_selector(MATCH), 'value'),
         Input(ids.source_selector(MATCH), 'id'),
         Input('_pages_location', 'hash'),
-    )
-
-    clientside_callback(
-        '''function (src, assignment, date, time, current) {
-            if (src === 'assignment' & (assignment === undefined | current.kwargs?.assignment === assignment)) {
-                return true;
-            }
-            if (src === 'timestamp' & current.kwargs?.requested_timestamp === new Date(`${date}T${time}`).getTime().toString()) {
-                return true;
-            }
-            if (src === 'latest' & current.src === 'latest') { return true; }
-            return false;
-        }
-        ''',
-        Output(ids.apply(MATCH), 'disabled'),
-        Input(ids.source_selector(MATCH), 'value'),
-        Input(ids.assignment_input(MATCH), 'value'),
-        Input(ids.date_input(MATCH), 'date'),
-        Input(ids.timestamp_input(MATCH), 'value'),
-        Input(ids.kwargs_store(MATCH), 'data'),
+        State(ids.source_selector(MATCH), 'value'),
     )

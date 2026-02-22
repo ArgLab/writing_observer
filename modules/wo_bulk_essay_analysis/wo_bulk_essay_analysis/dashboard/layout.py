@@ -9,37 +9,44 @@ import random
 
 from dash import html, dcc, clientside_callback, ClientsideFunction, Output, Input, State, ALL
 
+import learning_observer.settings
 import wo_classroom_text_highlighter.options
 
-# TODO pull this flag from settings
-DEBUG_FLAG = True
+DEBUG_FLAG = learning_observer.settings.RUN_MODE == learning_observer.settings.RUN_MODES.DEV
 
 prefix = 'bulk-essay-analysis'
 _websocket = f'{prefix}-websocket'
 _namespace = 'bulk_essay_feedback'
 
-alert = f'{prefix}-alert'
-alert_text = f'{prefix}-alert-text'
-alert_error_dump = f'{prefix}-alert-error-dump'
+# Alert
+_alert = f'{prefix}-alert'
+_alert_text = f'{prefix}-alert-text'
+_alert_error_dump = f'{prefix}-alert-error-dump'
 
+# Query input
 query_input = f'{prefix}-query-input'
 
+# Panel layout
 panel_layout = f'{prefix}-panel-layout'
 
-_advanced = f'{prefix}-advanced'
-_advanced_doc_src = f'{_advanced}-document-source'
-_advanced_toggle = f'{_advanced}-toggle'
-_advanced_collapse = f'{_advanced}-collapse'
-_advanced_close = f'{_advanced}-close'
-_advanced_width = f'{_advanced}-width'
-_advanced_height = f'{_advanced}-height'
-_advanced_hide_header = f'{_advanced}-hide-header'
-_advanced_text_information = f'{_advanced}-text-information'
+# ── Settings modal DOM IDs ─────────────────────────────────────────────
+_settings_prefix = f'{prefix}-settings'
+_settings_toggle = f'{_settings_prefix}-toggle'
+_settings_modal = f'{_settings_prefix}-modal'
+_settings_run = f'{_settings_prefix}-run'
+_settings_doc_src = f'{_settings_prefix}-document-source'
+_settings_width = f'{_settings_prefix}-width'
+_settings_height = f'{_settings_prefix}-height'
+_settings_hide_header = f'{_settings_prefix}-hide-header'
+_settings_text_information = f'{_settings_prefix}-text-information'
 
-_system_input = f'{prefix}-system-prompt-input'
-_system_input_tooltip = f'{_system_input}-tooltip'
+# System prompt: staged (in modal) and applied (in store)
+_system_input_staged = f'{prefix}-system-prompt-staged'
+_system_input_tooltip = f'{_system_input_staged}-tooltip'
+_applied_system_prompt = f'{prefix}-applied-system-prompt'
+_applied_doc_src = f'{_settings_prefix}-applied-doc-src'
 
-# placeholder DOM ids
+# Placeholder / tag DOM ids
 _tags = f'{prefix}-tags'
 placeholder_tooltip = f'{_tags}-placeholder-tooltip'
 tag = f'{_tags}-tag'
@@ -55,6 +62,7 @@ _tag_add_text = f'{_tag_add}-text'
 _tag_add_upload = f'{_tag_add}-upload'
 _tag_add_warning = f'{_tag_add}-warning'
 _tag_add_save = f'{_tag_add}-save'
+
 tag_modal = dbc.Modal([
     dbc.ModalHeader('Add Placeholder'),
     dbc.ModalBody([
@@ -86,12 +94,11 @@ tag_modal = dbc.Modal([
     ])
 ], id=_tag_add_modal, is_open=False)
 
-# prompt history DOM ids
+# Prompt history DOM ids
 history_body = f'{prefix}-history-body'
 history_store = f'{prefix}-history-store'
-favorite_store = f'{prefix}-favorite-store'
 
-# loading message/bar DOM ids
+# Loading message/bar DOM ids
 _loading_prefix = f'{prefix}-loading'
 _loading_collapse = f'{_loading_prefix}-collapse'
 _loading_progress = f'{_loading_prefix}-progress-bar'
@@ -99,33 +106,143 @@ _loading_information = f'{_loading_prefix}-information-text'
 
 submit = f'{prefix}-submit-btn'
 submit_warning_message = f'{prefix}-submit-warning-msg'
-_student_data_wrapper = f'{prefix}-student-data'
 grid = f'{prefix}-essay-grid'
 
-# Expanded student
+# ── Expanded student modal DOM IDs ─────────────────────────────────────
 _expanded_student = f'{prefix}-expanded-student'
-_expanded_student_selected = f'{_expanded_student}-selected'
-_expanded_student_panel = f'{_expanded_student}-panel'
+_expanded_student_modal = f'{_expanded_student}-modal'
+_expanded_student_title = f'{_expanded_student}-title'
 _expanded_student_child = f'{_expanded_student}-child'
-_expanded_student_close = f'{_expanded_student}-close'
-expanded_student_component = html.Div([
-    html.Div([
-        html.H3('Individual Student', className='d-inline-block'),
-        dbc.Button(
-            html.I(className='fas fa-close'),
-            className='float-end', id=_expanded_student_close,
-            color='transparent'),
-    ]),
-    dbc.Input(id=_expanded_student_selected, class_name='d-none'),
-    html.Div(id=_expanded_student_child)
-], className='p-2')
+_expanded_student_show_identity = f'{_expanded_student}-show-identity'
+_expanded_student_show_identity_toggle = f'{_expanded_student}-show-identity-toggle'
+_expanded_student_doc_title = f'{_expanded_student}-doc-title'
+_expanded_student_id = f'{_expanded_student}-id'
 
-# default prompts
-system_prompt = 'You are a helpful assistant for grade school teachers. Your task is to analyze '\
-    'student writing and provide clear, constructive, and age-appropriate feedback. '\
-    'Focus on key writing traits such as clarity, creativity, grammar, and organization. '\
-    'When summarizing, highlight the main ideas and key details. Always maintain a '\
+expanded_student_id_store = dcc.Store(
+    id=_expanded_student_id,
+    data=None
+)
+
+expanded_student_show_identity_store = dcc.Store(
+    id=_expanded_student_show_identity,
+    data=True
+)
+
+expanded_student_modal = dbc.Modal(
+    [
+        dbc.ModalHeader([
+            dbc.ModalTitle([
+                html.Div(id=_expanded_student_title),
+                html.Small(
+                    id=_expanded_student_doc_title,
+                    className='text-muted ms-2',
+                    style={'fontSize': '0.75em'}
+                ),
+            ], className='d-flex align-items-baseline'),
+            dbc.Button(
+                html.I(className='fas fa-eye', id=f'{_expanded_student_show_identity_toggle}-icon'),
+                id=_expanded_student_show_identity_toggle,
+                color='link',
+                size='sm',
+                className='ms-2 text-secondary',
+                title='Show/hide student name and document title',
+            ),
+        ], close_button=True, className='d-flex align-items-center'),
+        dbc.ModalBody(
+            html.Div(id=_expanded_student_child),
+            style={'overflowY': 'auto'},
+        ),
+    ],
+    id=_expanded_student_modal,
+    is_open=False,
+    size='xl',
+    centered=True,
+    scrollable=True,
+)
+
+# ── Walkthrough DOM IDs ────────────────────────────────────────────────
+_walkthrough_prefix = f'{prefix}-walkthrough'
+_walkthrough_store = f'{_walkthrough_prefix}-step'
+_walkthrough_modal = f'{_walkthrough_prefix}-modal'
+_walkthrough_title = f'{_walkthrough_prefix}-title'
+_walkthrough_body = f'{_walkthrough_prefix}-body'
+_walkthrough_counter = f'{_walkthrough_prefix}-counter'
+_walkthrough_back = f'{_walkthrough_prefix}-back'
+_walkthrough_next = f'{_walkthrough_prefix}-next'
+_walkthrough_done = f'{_walkthrough_prefix}-done'
+_walkthrough_skip = f'{_walkthrough_prefix}-skip'
+_walkthrough_seen_store = f'{_walkthrough_prefix}-seen'
+_help_button = f'{prefix}-help'
+
+walkthrough_seen_store = dcc.Store(
+    id=_walkthrough_seen_store,
+    storage_type='local',
+    data=False
+)
+
+walkthrough_store = dcc.Store(id=_walkthrough_store, data=0)
+
+walkthrough_modal = dbc.Modal(
+    [
+        dbc.ModalHeader(
+            dbc.ModalTitle(id=_walkthrough_title),
+            close_button=False,
+        ),
+        dbc.ModalBody(
+            html.Div(id=_walkthrough_body),
+            style={'minHeight': '200px'},
+        ),
+        dbc.ModalFooter(
+            html.Div([
+                html.Small(id=_walkthrough_counter, className='text-muted me-auto'),
+                dbc.Button(
+                    [html.I(className='fas fa-forward me-1'), 'Skip intro'],
+                    id=_walkthrough_skip,
+                    color='link',
+                    size='sm',
+                    className='me-auto text-muted',
+                ),
+                dbc.Button(
+                    [html.I(className='fas fa-arrow-left me-1'), 'Back'],
+                    id=_walkthrough_back,
+                    color='secondary',
+                    outline=True,
+                    size='sm',
+                    className='me-2',
+                ),
+                dbc.Button(
+                    ['Next', html.I(className='fas fa-arrow-right ms-1')],
+                    id=_walkthrough_next,
+                    color='primary',
+                    size='sm',
+                    className='me-2',
+                ),
+                dbc.Button(
+                    [html.I(className='fas fa-check me-1'), 'Get Started!'],
+                    id=_walkthrough_done,
+                    color='success',
+                    size='sm',
+                ),
+            ], className='d-flex align-items-center w-100'),
+        ),
+    ],
+    id=_walkthrough_modal,
+    is_open=False,
+    centered=True,
+    backdrop='static',
+    keyboard=False,
+    size='lg',
+)
+
+# ── Settings Modal ─────────────────────────────────────────────────────
+# Default prompts
+system_prompt = (
+    'You are a helpful assistant for grade school teachers. Your task is to analyze '
+    'student writing and provide clear, constructive, and age-appropriate feedback. '
+    'Focus on key writing traits such as clarity, creativity, grammar, and organization. '
+    'When summarizing, highlight the main ideas and key details. Always maintain a '
     'positive and encouraging tone to support student growth.'
+)
 
 starting_prompt = [
     'Provide 3 bullet points summarizing this text:\n{student_text}',
@@ -135,75 +252,144 @@ starting_prompt = [
     'Give one specific compliment and one gentle suggestion to improve this story:\n{student_text}'
 ]
 
+settings_modal = dbc.Modal([
+    dbc.ModalHeader(dbc.ModalTitle('Dashboard Settings'), close_button=True),
+    dbc.ModalBody([
+        lodrc.LODocumentSourceSelectorAIO(aio_id=_settings_doc_src),
+        dbc.Card([
+            dbc.CardHeader('System Prompt'),
+            dbc.CardBody([
+                html.P(
+                    "The system prompt guides the AI's behavior. It sets the context "
+                    "for how the AI should analyze or summarize student text.",
+                    className='text-muted small mb-2',
+                ),
+                dbc.Textarea(
+                    id=_system_input_staged,
+                    value=system_prompt,
+                    style={'minHeight': '150px'}
+                ),
+            ])
+        ], className='my-3'),
+        dbc.Card([
+            dbc.CardHeader('Display Settings'),
+            dbc.CardBody([
+                dbc.Label('Students per row'),
+                dbc.Input(type='number', min=1, max=10, value=2, step=1, id=_settings_width),
+                dbc.Label('Height of student tile'),
+                dcc.Slider(min=100, max=800, marks=None, value=350, id=_settings_height),
+                dbc.Label('Student profile'),
+                dbc.Switch(value=True, id=_settings_hide_header, label='Show/Hide'),
+            ])
+        ], className='mb-3'),
+        dbc.Card([
+            dbc.CardHeader('Metrics'),
+            dbc.CardBody([
+                html.P(
+                    'Select which metrics to display as badges on each student tile.',
+                    className='text-muted small mb-3',
+                ),
+                lodrc.WOSettings(
+                    id=_settings_text_information,
+                    options=wo_classroom_text_highlighter.options.PROCESS_OPTIONS,
+                    value=wo_classroom_text_highlighter.options.DEFAULT_VALUE,
+                    className='table table-striped align-middle'
+                )
+            ])
+        ])
+    ], style={'overflowY': 'auto'}),
+    dbc.ModalFooter(
+        dbc.Button(
+            [html.I(className='fas fa-check me-2'), 'Apply'],
+            id=_settings_run,
+            color='success',
+            size='lg',
+            className='w-100'
+        )
+    ),
+], id=_settings_modal, is_open=False, size='lg', scrollable=True,
+    style={'maxHeight': '100vh'})
+
+# Hidden stores for applied values
+applied_system_prompt_store = dcc.Store(
+    id=_applied_system_prompt,
+    data=system_prompt
+)
+applied_doc_src_store = dcc.Store(
+    id=_applied_doc_src,
+    data={}
+)
+
+# Alert Component
+alert_component = dbc.Alert([
+    html.Div(id=_alert_text),
+    html.Div(DashRenderjson(id=_alert_error_dump), className='' if DEBUG_FLAG else 'd-none')
+], id=_alert, color='danger', is_open=False)
+
+# Loading component
+loading_component = dbc.Collapse([
+    html.Div(id=_loading_information),
+    dbc.Progress(id=_loading_progress, animated=True, striped=True, max=1.1)
+], id=_loading_collapse, is_open=False, class_name='mb-1 sticky-top bg-light')
+
+# ── Settings toolbar ───────────────────────────────────────────────────
+input_group = dbc.InputGroup([
+    dbc.InputGroupText(lodrc.LOConnectionAIO(aio_id=_websocket)),
+    dbc.Button(
+        [html.I(className='fas fa-cog me-1'), 'Document Source & Display Settings'],
+        id=_settings_toggle,
+        color='secondary'
+    ),
+    dbc.Button(
+        [
+            html.I(className='fas fa-question-circle me-1'),
+            'Help'
+        ],
+        id=_help_button,
+        color='primary',
+        title='Reopen the walkthrough guide',
+    ),
+    lodrc.ProfileSidebarAIO(class_name='rounded-0 rounded-end', color='secondary'),
+], class_name='mb-1 align-items-center')
+
 
 def layout():
     '''
     Generic layout function to create dashboard
     '''
-    # advanced menu for system prompt
-    advanced = html.Div([
-        html.Div([
-            html.H3('Settings', className='d-inline-block'),
-            dbc.Button(
-                html.I(className='fas fa-close'),
-                className='float-end', id=_advanced_close,
-                color='transparent'),
-        ]),
-        lodrc.LODocumentSourceSelectorAIO(aio_id=_advanced_doc_src),
-        dbc.Card([
-            dbc.CardHeader('View Options'),
-            dbc.CardBody([
-                dbc.Label('Students per row'),
-                dbc.Input(type='number', min=1, max=10, value=2, step=1, id=_advanced_width),
-                dbc.Label('Height of student tile'),
-                dcc.Slider(min=100, max=800, marks=None, value=350, id=_advanced_height),
-                dbc.Label('Student profile'),
-                dbc.Switch(value=True, id=_advanced_hide_header, label='Show/Hide'),
-            ])
-        ]),
-        dbc.Card([
-            dbc.CardHeader('Information Options'),
-            dbc.CardBody(lodrc.WOSettings(
-                id=_advanced_text_information,
-                options=wo_classroom_text_highlighter.options.PROCESS_OPTIONS,
-                value=wo_classroom_text_highlighter.options.DEFAULT_VALUE,
-                className='table table-striped align-middle'
-            ))
-        ])
-    ])
-
-    # history panel
+    # History panel
     history_favorite_panel = dbc.Card([
         dbc.CardHeader('Prompt History'),
         dbc.CardBody([], id=history_body),
         dcc.Store(id=history_store, data=[])
     ], class_name='h-100')
 
-    # query creator panel
+    # Query creator panel
     input_panel = dbc.Card([
         dbc.CardHeader('Prompt Input'),
         dbc.CardBody([
-            dbc.Label([
-                'System prompt',
-                html.I(className='fas fa-circle-question ms-1', id=_system_input_tooltip)
-            ]),
-            dbc.Tooltip(
-                "A system prompt guides the AI's responses. It sets the context for how the AI should analyze or summarize student text.",
-                target=_system_input_tooltip
-            ),
-            dbc.Textarea(id=_system_input, value=system_prompt, style={'minHeight': '120px'}),
             dbc.Label('Query'),
-            dbc.Textarea(id=query_input, value=random.choice(starting_prompt), class_name='h-100', style={'minHeight': '150px'}),
+            dbc.Textarea(
+                id=query_input,
+                value=random.choice(starting_prompt),
+                class_name='h-100',
+                style={'minHeight': '150px'}
+            ),
             html.Div([
                 html.Span([
                     'Placeholders',
                     html.I(className='fas fa-circle-question ms-1', id=placeholder_tooltip)
                 ], className='me-1'),
                 html.Span([], id=_tags),
-                dbc.Button([html.I(className='fas fa-add me-1'), 'Add'], id=_tag_add_open, class_name='ms-1 mb-1')
+                dbc.Button(
+                    [html.I(className='fas fa-add me-1'), 'Add'],
+                    id=_tag_add_open,
+                    class_name='ms-1 mb-1'
+                )
             ], className='mt-1'),
             dbc.Tooltip(
-                'Click a placeholder to insert it into your query. Upon submission, it will be replaced with the corresponding value.',
+                'Click a placeholder to insert it into your query. Upon submission, '
+                'it will be replaced with the corresponding value.',
                 target=placeholder_tooltip
             ),
             tag_modal,
@@ -211,28 +397,36 @@ def layout():
         ]),
         dbc.CardFooter([
             html.Small(id=submit_warning_message, className='text-secondary'),
-            dbc.Button('Submit', color='primary', id=submit, n_clicks=0, class_name='float-end')
+            dbc.Button(
+                [html.I(className='fas fa-paper-plane me-1'), 'Submit'],
+                color='primary',
+                id=submit,
+                n_clicks=0,
+                class_name='float-end'
+            )
         ])
     ])
 
-    alert_component = dbc.Alert([
-        html.Div(id=alert_text),
-        html.Div(DashRenderjson(id=alert_error_dump), className='' if DEBUG_FLAG else 'd-none')
-    ], id=alert, color='danger', is_open=False)
-
-    loading_component = dbc.Collapse([
-        html.Div(id=_loading_information),
-        dbc.Progress(id=_loading_progress, animated=True, striped=True, max=1.1)
-    ], id=_loading_collapse, is_open=False, class_name='mb-1 sticky-top bg-light')
-
-    # overall container
     cont = dbc.Container([
-        html.H1('Writing Observer - Classroom AI Feedback Assistant'),
-        dbc.InputGroup([
-            dbc.InputGroupText(lodrc.LOConnectionAIO(aio_id=_websocket)),
-            dbc.Button([html.I(className='fas fa-cog me-1'), 'Advanced'], id=_advanced_toggle),
-            lodrc.ProfileSidebarAIO(class_name='rounded-0 rounded-end', color='secondary'),
-        ], class_name='mb-1'),
+        html.H1('Writing Observer — Classroom AI Feedback Assistant'),
+        # Stores
+        applied_system_prompt_store,
+        applied_doc_src_store,
+        walkthrough_store,
+        walkthrough_seen_store,
+        expanded_student_id_store,
+        expanded_student_show_identity_store,
+        # Modals
+        walkthrough_modal,
+        settings_modal,
+        expanded_student_modal,
+        # Toolbar
+        html.Div([
+            html.Div(input_group, className='d-flex me-2'),
+            html.Div(loading_component, className='d-flex')
+        ], className='d-flex sticky-top pb-1 bg-light'),
+        alert_component,
+        # Prompt input + history
         lodrc.LOPanelLayout(
             input_panel,
             panels=[
@@ -241,57 +435,97 @@ def layout():
             shown=['history-favorite'],
             id=panel_layout
         ),
-        alert_component,
         html.H3('Student Text', className='mt-1'),
-        loading_component,
-        lodrc.LOPanelLayout(
-            html.Div(id=grid, className='d-flex justify-content-between flex-wrap'),
-            panels=[
-                {'children': advanced, 'width': '30%', 'id': _advanced_collapse, 'side': 'left' },
-                {'children': expanded_student_component,
-                 'width': '30%', 'id': _expanded_student_panel,
-                 'side': 'right'}
-            ],
-            id=_student_data_wrapper, shown=[]
-        ),
+        html.Div(id=grid, className='d-flex justify-content-between flex-wrap'),
     ], fluid=True)
     return html.Div(cont)
 
 
-# Toggle if the advanced menu collapse is open or not
+# ══════════════════════════════════════════════════════════════════════
+# Walkthrough callbacks
+# ══════════════════════════════════════════════════════════════════════
+
+# On load or when step changes, sync with localStorage
 clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='toggleAdvanced'),
-    Output(_student_data_wrapper, 'shown', allow_duplicate=True),
-    Input(_advanced_toggle, 'n_clicks'),
-    State(_student_data_wrapper, 'shown'),
+    ClientsideFunction(namespace=_namespace, function_name='initWalkthroughFromStorage'),
+    Output(_walkthrough_store, 'data', allow_duplicate=True),
+    Output(_walkthrough_seen_store, 'data'),
+    Input(_walkthrough_store, 'data'),
+    State(_walkthrough_seen_store, 'data'),
+    prevent_initial_call='initial_duplicate',
+)
+
+# Navigate between walkthrough steps
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='navigateWalkthrough'),
+    Output(_walkthrough_store, 'data'),
+    Input(_walkthrough_next, 'n_clicks'),
+    Input(_walkthrough_back, 'n_clicks'),
+    Input(_walkthrough_done, 'n_clicks'),
+    Input(_walkthrough_skip, 'n_clicks'),
+    Input(_help_button, 'n_clicks'),
+    State(_walkthrough_store, 'data'),
+    prevent_initial_call=True,
+)
+
+# Render walkthrough step content
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='renderWalkthroughStep'),
+    Output(_walkthrough_title, 'children'),
+    Output(_walkthrough_body, 'children'),
+    Output(_walkthrough_back, 'disabled'),
+    Output(_walkthrough_next, 'style'),
+    Output(_walkthrough_done, 'style'),
+    Output(_walkthrough_counter, 'children'),
+    Output(_walkthrough_modal, 'is_open'),
+    Input(_walkthrough_store, 'data'),
+)
+
+# ══════════════════════════════════════════════════════════════════════
+# Settings modal callbacks
+# ══════════════════════════════════════════════════════════════════════
+
+# Toggle settings modal open
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='toggleSettingsModal'),
+    Output(_settings_modal, 'is_open'),
+    Input(_settings_toggle, 'n_clicks'),
+    State(_settings_modal, 'is_open'),
     prevent_initial_call=True
 )
 
+# Apply settings and close modal
 clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='closeAdvanced'),
-    Output(_student_data_wrapper, 'shown', allow_duplicate=True),
-    Input(_advanced_close, 'n_clicks'),
-    State(_student_data_wrapper, 'shown'),
+    ClientsideFunction(namespace=_namespace, function_name='applySettingsAndCloseModal'),
+    Output(_applied_system_prompt, 'data'),
+    Output(_applied_doc_src, 'data'),
+    Output(_settings_modal, 'is_open', allow_duplicate=True),
+    Input(_settings_run, 'n_clicks'),
+    State(_system_input_staged, 'value'),
+    State(lodrc.LODocumentSourceSelectorAIO.ids.kwargs_store(_settings_doc_src), 'data'),
     prevent_initial_call=True
 )
 
-# send request on websocket
+# ══════════════════════════════════════════════════════════════════════
+# Core dashboard callbacks
+# ══════════════════════════════════════════════════════════════════════
+
+# Send request on websocket
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='send_to_loconnection'),
+    ClientsideFunction(namespace=_namespace, function_name='send_to_loconnection'),
     Output(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'send'),
-    Input(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'state'),  # used for initial setup
+    Input(lodrc.LOConnectionAIO.ids.websocket(_websocket), 'state'),
     Input('_pages_location', 'hash'),
     Input(submit, 'n_clicks'),
-    Input(lodrc.LODocumentSourceSelectorAIO.ids.kwargs_store(_advanced_doc_src), 'data'),
+    Input(_applied_doc_src, 'data'),
     State(query_input, 'value'),
-    State(_system_input, 'value'),
+    State(_applied_system_prompt, 'data'),
     State(tag_store, 'data'),
 )
 
-# enable/disabled submit based on query
-# makes sure there is a query and the tags are properly formatted
+# Enable/disable submit based on query
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='disableQuerySubmitButton'),
+    ClientsideFunction(namespace=_namespace, function_name='disableQuerySubmitButton'),
     Output(submit, 'disabled'),
     Output(submit_warning_message, 'children'),
     Input(query_input, 'value'),
@@ -299,24 +533,23 @@ clientside_callback(
     Input(tag_store, 'data')
 )
 
-# add submitted query to history and clear input
+# Add submitted query to history
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='update_input_history_on_query_submission'),
+    ClientsideFunction(namespace=_namespace, function_name='update_input_history_on_query_submission'),
     Output(history_store, 'data'),
     Input(submit, 'n_clicks'),
     State(query_input, 'value'),
     State(history_store, 'data')
 )
 
-# update history based on history browser storage
-# TODO create a history component that can handle favorites
+# Update history list display
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='update_history_list'),
+    ClientsideFunction(namespace=_namespace, function_name='update_history_list'),
     Output(history_body, 'children'),
     Input(history_store, 'data')
 )
 
-# Toggle if the add placeholder is open or not
+# Toggle add placeholder modal
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='openTagAddModal'),
     Output(_tag_add_modal, 'is_open'),
@@ -329,9 +562,9 @@ clientside_callback(
     State({'type': _tag_edit, 'index': ALL}, 'id'),
 )
 
-# show attachment panel upon uploading document and populate fields
+# Handle file upload to placeholder text field
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='handleFileUploadToTextField'),
+    ClientsideFunction(namespace=_namespace, function_name='handleFileUploadToTextField'),
     Output(_tag_add_text, 'value', allow_duplicate=True),
     Input(_tag_add_upload, 'contents'),
     Input(_tag_add_upload, 'filename'),
@@ -339,30 +572,31 @@ clientside_callback(
     prevent_initial_call=True
 )
 
+# Update alert with errors
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateAlertWithError'),
-    Output(alert_text, 'children'),
-    Output(alert, 'is_open'),
-    Output(alert_error_dump, 'data'),
+    Output(_alert_text, 'children'),
+    Output(_alert, 'is_open'),
+    Output(_alert_error_dump, 'data'),
     Input(lodrc.LOConnectionAIO.ids.error_store(_websocket), 'data')
 )
 
-# update student cards based on new data in storage
+# Update student grid
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateStudentGridOutput'),
     Output(grid, 'children'),
     Input(lodrc.LOConnectionAIO.ids.ws_store(_websocket), 'data'),
     Input(history_store, 'data'),
-    Input(_advanced_width, 'value'),
-    Input(_advanced_height, 'value'),
-    Input(_advanced_hide_header, 'value'),
-    Input(_advanced_text_information, 'value'),
-    State(_advanced_text_information, 'options')
+    Input(_settings_width, 'value'),
+    Input(_settings_height, 'value'),
+    Input(_settings_hide_header, 'value'),
+    Input(_settings_text_information, 'value'),
+    State(_settings_text_information, 'options')
 )
 
-# append tag in curly braces to input
+# Append tag to query input
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='add_tag_to_input'),
+    ClientsideFunction(namespace=_namespace, function_name='add_tag_to_input'),
     Output(query_input, 'value', allow_duplicate=True),
     Input({'type': tag, 'index': ALL}, 'n_clicks'),
     State(query_input, 'value'),
@@ -370,9 +604,9 @@ clientside_callback(
     prevent_initial_call=True
 )
 
-# enable/disable the save attachment button if tag is already in use/blank
+# Enable/disable save attachment button
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='disableAttachmentSaveButton'),
+    ClientsideFunction(namespace=_namespace, function_name='disableAttachmentSaveButton'),
     Output(_tag_add_save, 'disabled'),
     Output(_tag_add_warning, 'children'),
     Input(_tag_add_label, 'value'),
@@ -381,16 +615,16 @@ clientside_callback(
     State(_tag_replacement_id, 'value')
 )
 
-# populate word bank of tags
+# Populate tag word bank
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='update_tag_buttons'),
+    ClientsideFunction(namespace=_namespace, function_name='update_tag_buttons'),
     Output(_tags, 'children'),
     Input(tag_store, 'data')
 )
 
-# save placeholder to storage
+# Save placeholder to storage
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='savePlaceholder'),
+    ClientsideFunction(namespace=_namespace, function_name='savePlaceholder'),
     Output(tag_store, 'data'),
     Output(_tag_add_modal, 'is_open', allow_duplicate=True),
     Input(_tag_add_save, 'n_clicks'),
@@ -401,9 +635,9 @@ clientside_callback(
     prevent_initial_call=True
 )
 
-# remove placeholder from storage
+# Remove placeholder from storage
 clientside_callback(
-    ClientsideFunction(namespace='bulk_essay_feedback', function_name='removePlaceholder'),
+    ClientsideFunction(namespace=_namespace, function_name='removePlaceholder'),
     Output(tag_store, 'data', allow_duplicate=True),
     Input({'type': _tag_delete, 'index': ALL}, 'submit_n_clicks'),
     State(tag_store, 'data'),
@@ -411,7 +645,7 @@ clientside_callback(
     prevent_initial_call=True
 )
 
-# update loading information
+# Update loading information
 clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='updateLoadingInformation'),
     Output(_loading_collapse, 'is_open'),
@@ -426,40 +660,63 @@ clientside_callback(
     ClientsideFunction(namespace=_namespace, function_name='adjustTileSize'),
     Output({'type': 'WOAIAssistStudentTile', 'index': ALL}, 'style', allow_duplicate=True),
     Output({'type': 'WOAIAssistStudentTileText', 'index': ALL}, 'style', allow_duplicate=True),
-    Input(_advanced_width, 'value'),
-    Input(_advanced_height, 'value'),
+    Input(_settings_width, 'value'),
+    Input(_settings_height, 'value'),
     State({'type': 'WOAIAssistStudentTile', 'index': ALL}, 'id'),
     prevent_initial_call=True
 )
 
-# Expand a single student
+# Expand a single student into modal
+# ── Expand: record which student was clicked, open modal ──────────────
 clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='selectStudentForExpansion'),
-    Output(_expanded_student_selected, 'value'),
-    Output(_student_data_wrapper, 'shown', allow_duplicate=True),
+    ClientsideFunction(namespace=_namespace, function_name='expandCurrentStudent'),
+    Output(_expanded_student_id, 'data'),
+    Output(_expanded_student_modal, 'is_open'),
+    Output(_expanded_student_show_identity, 'data'),
     Input({'type': 'WOAIAssistStudentTileExpand', 'index': ALL}, 'n_clicks'),
-    State(_student_data_wrapper, 'shown'),
     State({'type': 'WOAIAssistStudentTile', 'index': ALL}, 'id'),
+    State(_expanded_student_modal, 'is_open'),
+    State(_expanded_student_id, 'data'),
+    State(_settings_hide_header, 'value'),
     prevent_initial_call=True
 )
 
-# Update expanded children based on selected student
+# ── Expand: reactively render content from live websocket data ────────
 clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='expandSelectedStudent'),
+    ClientsideFunction(namespace=_namespace, function_name='renderExpandedStudent'),
+    Output(_expanded_student_title, 'children'),
+    Output(_expanded_student_doc_title, 'children'),
     Output(_expanded_student_child, 'children'),
-    Input(_expanded_student_selected, 'value'),
     Input(lodrc.LOConnectionAIO.ids.ws_store(_websocket), 'data'),
-    Input(_advanced_hide_header, 'value'),
-    Input(history_store, 'data'),
-    Input(_advanced_text_information, 'value'),
-    State(_advanced_text_information, 'options')
+    Input(_expanded_student_id, 'data'),
+    State(_expanded_student_modal, 'is_open'),
+    State(history_store, 'data'),
+    State(_settings_text_information, 'value'),
+    State(_settings_text_information, 'options'),
 )
 
-# Close expanded student
+# Toggle identity visibility within the expanded modal
 clientside_callback(
-    ClientsideFunction(namespace=_namespace, function_name='closeExpandedStudent'),
-    Output(_student_data_wrapper, 'shown', allow_duplicate=True),
-    Input(_expanded_student_close, 'n_clicks'),
-    State(_student_data_wrapper, 'shown'),
+    ClientsideFunction(namespace=_namespace, function_name='toggleExpandedStudentIdentity'),
+    Output(_expanded_student_show_identity, 'data', allow_duplicate=True),
+    Input(_expanded_student_show_identity_toggle, 'n_clicks'),
+    State(_expanded_student_show_identity, 'data'),
     prevent_initial_call=True
+)
+
+# Render identity visibility in the expanded modal (hide/show name, doc title, icon)
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='renderExpandedStudentIdentity'),
+    Output(_expanded_student_title, 'style'),
+    Output(_expanded_student_doc_title, 'style'),
+    Output(f'{_expanded_student_show_identity_toggle}-icon', 'className'),
+    Input(_expanded_student_show_identity, 'data'),
+)
+
+# Show/hide student tile headers
+clientside_callback(
+    ClientsideFunction(namespace=_namespace, function_name='showHideHeader'),
+    Output({'type': 'WOAIAssistStudentTileText', 'index': ALL}, 'showName'),
+    Input(_settings_hide_header, 'value'),
+    State({'type': 'WOAIAssistStudentTileText', 'index': ALL}, 'id'),
 )

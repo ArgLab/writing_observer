@@ -11,7 +11,7 @@ import LONameTag from './LONameTag.react';
  */
 export default class WOStudentTextTile extends Component {
   render () {
-    const { id, className, style, showName, profile, currentStudentHash, currentOptionHash, childComponent, additionalButtons } = this.props;
+    const { id, className, style, showName, profile, documentTitle, currentStudentHash, currentOptionHash, childComponent, additionalButtons } = this.props;
     const isLoading = currentOptionHash !== currentStudentHash;
     let bodyClassName = isLoading ? 'loading' : '';
     bodyClassName = `${bodyClassName} overflow-auto position-relative`;
@@ -19,20 +19,29 @@ export default class WOStudentTextTile extends Component {
     return (
       <Card key={`WOStudentTextTile-${id}`} className={`WOStudentTextTile ${className}`} style={style} id={id}>
         <Card.Header>
-          <LONameTag
-            id='lo-name-tag'
-            profile={profile || {}}
-            includeName={true}
-            className={showName ? 'd-inline-flex align-items-center' : 'd-none'}
-          />
-          <ButtonGroup className='float-end'>
-            {isLoading && (
-              <Button variant='transparent'>
-                <div className='loading-circle'/>
-              </Button>
-            )}
-            {additionalButtons && additionalButtons}
-          </ButtonGroup>
+          <div className='d-flex align-items-start justify-content-between'>
+            <div>
+              <LONameTag
+                id='lo-name-tag'
+                profile={profile || {}}
+                includeName={true}
+                className={showName ? 'd-inline-flex align-items-center' : 'd-none'}
+              />
+              {documentTitle && showName && (
+                <div className='text-muted' style={{ fontSize: '0.75em', lineHeight: 1.2 }}>
+                  {documentTitle}
+                </div>
+              )}
+            </div>
+            <ButtonGroup>
+              {isLoading && (
+                <Button variant='transparent'>
+                  <div className='loading-circle'/>
+                </Button>
+              )}
+              {additionalButtons && additionalButtons}
+            </ButtonGroup>
+          </div>
         </Card.Header>
         <Card.Body className={bodyClassName}>
           {childComponent}
@@ -46,7 +55,8 @@ WOStudentTextTile.defaultProps = {
   className: '',
   showName: true,
   style: {},
-  profile: {}
+  profile: {},
+  documentTitle: ''
 };
 
 WOStudentTextTile.propTypes = {
@@ -71,6 +81,12 @@ WOStudentTextTile.propTypes = {
    * name should be visible or not
    */
   showName: PropTypes.bool,
+
+  /**
+   * Title of the currently selected document.
+   * Displayed beneath the student name when present and showName is true.
+   */
+  documentTitle: PropTypes.string,
 
   /**
    * Hash of the current options, used to determine if we

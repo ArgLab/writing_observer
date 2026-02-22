@@ -19,6 +19,7 @@ import string
 
 import aiohttp
 import aiohttp.web
+import aiohttp_session
 
 import learning_observer.constants as constants
 import learning_observer.settings as settings
@@ -99,12 +100,24 @@ async def raw_api_ajax(
     request = runtime.get_request()
     url = target_url.format(**kwargs)
     user = await learning_observer.auth.get_active_user(request)
-    if constants.AUTH_HEADERS not in request or user is None:
+
+    # Auth headers may live on the request (set during the LTI launch
+    # redirect) OR in the session (persisted for subsequent requests).
+    # We need to check both sources.
+    auth_headers = request.get(constants.AUTH_HEADERS)
+    if auth_headers is None:
+        session = await aiohttp_session.get_session(request)
+        auth_headers = session.get(constants.AUTH_HEADERS)
+        # Populate request so downstream code can find them too
+        if auth_headers is not None:
+            request[constants.AUTH_HEADERS] = auth_headers
+
+    if auth_headers is None or user is None:
         raise aiohttp.web.HTTPUnauthorized(text="Please log in")
 
     if headers is None:
         headers = {}
-    headers.update(request.get(constants.AUTH_HEADERS, {}))
+    headers.update(auth_headers)
 
     method = method.lower()
     cache_available = method == 'get' and cache is not None and cache_key_prefix is not None
