@@ -1128,7 +1128,7 @@ export default function EssayComparison() {
         target_exports: ["student_with_docs"],
         kwargs: {
           course_id: courseId,
-          student_id: [{ user_id: studentID }],
+          student_id: studentID,
         },
       },
     };

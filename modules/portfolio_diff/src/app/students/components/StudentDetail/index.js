@@ -171,18 +171,7 @@ const GENRE_COLORS = { Document: "hsl(160 70% 40%)" };
    HELPERS
    ============================================================= */
 
-const getStudentById = (id) => {
-  const init = (id || "ST").slice(0, 2).toUpperCase();
-  return {
-    id,
-    name: id ? String(id).replace(/[-_]/g, " ") : "Student",
-    initials: init,
-    avatarColor: "bg-gray-100",
-    textColor: "text-gray-700",
-    gradeLevel: "—",
-    section: "—",
-  };
-};
+
 
 const median = (arr) => {
   if (!arr.length) return 0;
@@ -245,8 +234,8 @@ const formatDocTitle = (docId, meta) => {
   return docId ? String(docId).replace(/[-_]/g, " ") : "Document";
 };
 
-const getDocObjFromLO = (data2, studentID, docId) => {
-  const s = data2?.students?.[studentID];
+const getDocObjFromLO = (data, studentID, docId) => {
+  const s = data?.students?.[studentID];
   const d1 = s?.documents?.[docId];
   if (d1 && typeof d1 === "object") return d1;
   const d2 = s?.docs?.[docId];
@@ -258,8 +247,8 @@ const getDocObjFromLO = (data2, studentID, docId) => {
   return null;
 };
 
-const getDocTextFromLO = (data2, studentID, docId) => {
-  const doc = getDocObjFromLO(data2, studentID, docId);
+const getDocTextFromLO = (data, studentID, docId) => {
+  const doc = getDocObjFromLO(data, studentID, docId);
   const t = doc?.text;
   return typeof t === "string" ? t : "";
 };
@@ -304,7 +293,7 @@ function metricCoveragePercent(doc, metricId) {
   return (covered / L) * 100;
 }
 
-const buildEssaysFromDocs = ({ studentID, documentIDS, docsObj, data2 }) => {
+const buildEssaysFromDocs = ({ studentID, documentIDS, docsObj, data }) => {
   const out = (documentIDS || []).map((docId) => {
     const meta = docsObj?.[docId] || {};
     const lastAccess = meta?.last_access;
@@ -322,9 +311,9 @@ const buildEssaysFromDocs = ({ studentID, documentIDS, docsObj, data2 }) => {
 
     const category = dateObj ? `${monthsLong[dateObj.getMonth()]} ${dateObj.getFullYear()}` : "Unknown date";
 
-    const doc = getDocObjFromLO(data2, studentID, docId);
+    const doc = getDocObjFromLO(data, studentID, docId);
     const text =
-      doc?.text && typeof doc.text === "string" ? doc.text : getDocTextFromLO(data2, studentID, docId);
+      doc?.text && typeof doc.text === "string" ? doc.text : getDocTextFromLO(data, studentID, docId);
 
     const wordsArr = wordSplit(text);
     const words = wordsArr.length;
@@ -358,79 +347,6 @@ const buildEssaysFromDocs = ({ studentID, documentIDS, docsObj, data2 }) => {
 };
 
 /* =============================================================
-   child: fetch docs by id & lift to parent
-   ============================================================= */
-
-function StudentDocsByIdFetcher({ studentID, documentIDS, setData2, setErrors2, setConnection2 }) {
-  const { courseId } = useCourseIdContext();
-  const dataScope2 = useMemo(() => {
-    return {
-      wo: {
-        execution_dag: "writing_observer",
-        target_exports: ["single_student_doc_by_id"],
-        kwargs: {
-          course_id: courseId,
-          student_id: documentIDS.map(() => ({ user_id: studentID })),
-          document: documentIDS.map((doc_id) => ({ doc_id })),
-        },
-      },
-    };
-  }, [courseId, documentIDS, studentID]);
-
-  const origin =
-    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
-    getWsOriginFromWindow() ||
-    "ws://localhost:8888";
-
-  const { data, errors, connection } = useLOConnectionDataManager({
-    url: `${origin}/wsapi/communication_protocol`,
-    dataScope: dataScope2,
-  });
-
-  const prevSigsRef = useRef({ dataSig: "", errSig: "", connSig: "" });
-
-  const dataSig = useMemo(() => {
-    const studentsCount =
-      data?.students && typeof data.students === "object" ? Object.keys(data.students).length : 0;
-    const topKeys = data && typeof data === "object" ? Object.keys(data).length : 0;
-    return `top:${topKeys}|students:${studentsCount}`;
-  }, [data]);
-
-  const errSig = useMemo(() => {
-    if (!errors) return "noerr";
-    if (Array.isArray(errors)) return `errarr:${errors.length}`;
-    if (typeof errors === "object") return `errobj:${Object.keys(errors).length}`;
-    return "err:1";
-  }, [errors]);
-
-  const connSig = useMemo(() => {
-    if (!connection) return "noconn";
-    const s = connection.status ?? connection.readyState ?? "unknown";
-    const u = connection.url ?? "";
-    return `status:${s}|url:${u}`;
-  }, [connection]);
-
-  useEffect(() => {
-    const prev = prevSigsRef.current;
-
-    if (prev.dataSig !== dataSig) {
-      prev.dataSig = dataSig;
-      setData2(data);
-    }
-    if (prev.errSig !== errSig) {
-      prev.errSig = errSig;
-      setErrors2(errors);
-    }
-    if (prev.connSig !== connSig) {
-      prev.connSig = connSig;
-      setConnection2(connection);
-    }
-  }, [dataSig, errSig, connSig, data, errors, connection, setData2, setErrors2, setConnection2]);
-
-  return null;
-}
-
-/* =============================================================
    component
    ============================================================= */
 
@@ -460,34 +376,56 @@ export default function StudentDetail({ studentId }) {
   const [openEssay, setOpenEssay] = useState(null);
   const { courseId } = useCourseIdContext();
 
-  // quick range active state (for the pill buttons below)
-  const [activeQuickRange, setActiveQuickRange] = useState("all"); // "all" | "3mo" | "6mo" | "9mo"
+  const [activeQuickRange, setActiveQuickRange] = useState("all");
 
-  // ------ LO connection #1: student_with_docs ------
-  const dataScope = useMemo(() => {
-    return {
-      wo: {
-        execution_dag: "writing_observer",
-        target_exports: ["student_with_docs"],
-        kwargs: {
-          course_id: courseId,
-          student_id: [{ user_id: studentID }],
-        },
+  // ------ Initial dataScope: only student_with_docs ------
+  const initialDataScope = useMemo(() => ({
+    wo: {
+      execution_dag: "writing_observer",
+      target_exports: ["student_with_docs", "single_student_profile"],
+      kwargs: {
+        course_id: courseId,
+        student_id: studentID,
       },
-    };
-  }, [courseId, studentID]);
+    },
+  }), [courseId, studentID]);
 
   const origin =
     process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
     getWsOriginFromWindow() ||
     "ws://localhost:8888";
 
-  const { data } = useLOConnectionDataManager({
+  // Single hook for the entire page
+  const { data, errors, connection } = useLOConnectionDataManager({
     url: `${origin}/wsapi/communication_protocol`,
-    dataScope,
+    dataScope: initialDataScope,
   });
 
+  // ------ Derive docsObj & documentIDS from student_with_docs response ------
   const docsObj = data?.students?.[studentID]?.docs || {};
+  const studentProfile = data?.students?.[studentID]?.profile?.name || {};
+  const studentName = studentProfile?.full_name || studentProfile?.name || studentID;
+
+  const getStudentById = useCallback((id) => {
+    const profile = data?.students?.[id]?.profile;
+    const name = profile?.name?.full_name || profile?.name?.name || (id ? String(id).replace(/[-_]/g, " ") : "Student");
+
+    const initials = name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "ST";
+    return {
+      id,
+      name,
+      initials,
+      avatarColor: "bg-gray-100",
+      textColor: "text-gray-700",
+      gradeLevel: profile?.grade_level || "—",
+      section: profile?.section || "—",
+    };
+  }, [data]);
 
   const documentIDS = useMemo(() => {
     const ids = Object.keys(docsObj || {});
@@ -495,21 +433,41 @@ export default function StudentDetail({ studentId }) {
     return ids;
   }, [docsObj]);
 
-  // ------ LO connection #2: single_student_doc_by_id (lifted state) ------
-  const [data2, setData2] = useState(null);
-  const [errors2, setErrors2] = useState(null);
-  const [connection2, setConnection2] = useState(null);
+  // ------ When documentIDS changes, send updated dataScope via connection ------
+  const prevDocIDSSigRef = useRef("");
+
+  useEffect(() => {
+    const sig = documentIDS.join(",");
+    if (sig === prevDocIDSSigRef.current) return;
+    if (documentIDS.length === 0) return;
+    if (!connection?.sendMessage) return;
+
+    prevDocIDSSigRef.current = sig;
+
+    const updatedDataScope = {
+      wo: {
+        execution_dag: "writing_observer",
+        target_exports: ["student_with_docs", "single_student_doc_by_id", "single_student_profile"],
+        kwargs: {
+          course_id: courseId,
+          student_id: studentID,
+          doc_ids: documentIDS,
+        },
+      }
+    };
+
+    connection.sendMessage(JSON.stringify(updatedDataScope));
+  }, [documentIDS, connection, courseId, studentID]);
 
   const essays = useMemo(() => {
     return buildEssaysFromDocs({
       studentID,
       documentIDS,
       docsObj,
-      data2,
+      data,
     });
-  }, [studentID, documentIDS, docsObj, data2]);
+  }, [studentID, documentIDS, docsObj, data]);
 
-  // Build metricSections INSIDE component (stable, and uses icon components)
   const metricSections = useMemo(() => {
     return Object.entries(CATEGORY_KEYS).map(([categoryKey, title]) => {
       const list = METRIC_DEFS_RAW.filter((m) => m.categoryKey === categoryKey).map((m) => m.id);
@@ -669,7 +627,6 @@ export default function StudentDetail({ studentId }) {
     return () => window.removeEventListener("click", onClick);
   }, []);
 
-  // only All time / 3 mo / 6 mo / 9 mo, and show active
   const applyQuickRange = (key) => {
     setActiveQuickRange(key);
 
@@ -683,24 +640,23 @@ export default function StudentDetail({ studentId }) {
 
     const last = new Date(essaysAscAll[essaysAscAll.length - 1].dateISO);
     const end = new Date(last);
-    const start = new Date(last);
+    const start2 = new Date(last);
 
-    if (key === "3mo") start.setMonth(start.getMonth() - 3);
-    if (key === "6mo") start.setMonth(start.getMonth() - 6);
-    if (key === "9mo") start.setMonth(start.getMonth() - 9);
+    if (key === "3mo") start2.setMonth(start2.getMonth() - 3);
+    if (key === "6mo") start2.setMonth(start2.getMonth() - 6);
+    if (key === "9mo") start2.setMonth(start2.getMonth() - 9);
 
-    setStartDate(start.toISOString().slice(0, 10));
+    setStartDate(start2.toISOString().slice(0, 10));
     setEndDate(end.toISOString().slice(0, 10));
   };
 
-  // If user manually edits dates, reflect that by clearing the “active” pill highlight
   const onStartDateChange = (v) => {
     setStartDate(v);
-    setActiveQuickRange(""); // custom
+    setActiveQuickRange("");
   };
   const onEndDateChange = (v) => {
     setEndDate(v);
-    setActiveQuickRange(""); // custom
+    setActiveQuickRange("");
   };
 
   const clearFilters = () => {
@@ -721,16 +677,6 @@ export default function StudentDetail({ studentId }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {documentIDS.length > 0 && (
-        <StudentDocsByIdFetcher
-          studentID={studentID}
-          documentIDS={documentIDS}
-          setData2={setData2}
-          setErrors2={setErrors2}
-          setConnection2={setConnection2}
-        />
-      )}
-
       <div className="p-6 pb-0 px-6 mx-auto">
         <nav className="text-sm text-gray-500 mb-4" aria-label="Breadcrumb">
           <ol className="inline-flex items-center space-x-1 md:space-x-3">
@@ -747,13 +693,16 @@ export default function StudentDetail({ studentId }) {
             <li className="inline-flex items-center text-gray-700 font-medium">
               <span className="inline-flex items-center gap-2">
                 <span
-                  className={`inline-flex items-center justify-center h-6 w-6 rounded-full ${
-                    getStudentById(studentId).avatarColor
-                  } ${getStudentById(studentId).textColor} text-xs font-semibold`}
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold"
                 >
-                  {getStudentById(studentId).initials}
+                  {studentName
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)}
                 </span>
-                {getStudentById(studentId).name}
+                {studentName}
               </span>
             </li>
           </ol>
@@ -854,7 +803,6 @@ export default function StudentDetail({ studentId }) {
                 />
               </div>
 
-              {/* Apply active styling HERE (this is the date filter you referenced) */}
               <div className="inline-flex bg-white border border-gray-200 rounded-full p-1 shadow-sm">
                 <button
                   type="button"
@@ -918,9 +866,9 @@ export default function StudentDetail({ studentId }) {
             GENRE_COLORS={GENRE_COLORS}
             genreSegments={genreSegments}
             essaysInRangeAsc={essaysInRangeAsc}
-            loDocData={data2}
-            loDocErrors={errors2}
-            loDocConnection={connection2}
+            loDocData={data}
+            loDocErrors={errors}
+            loDocConnection={connection}
           />
         ) : (
           <StudentDetailCompare
@@ -950,9 +898,9 @@ export default function StudentDetail({ studentId }) {
             getStudentById={getStudentById}
             router={router}
             GENRE_COLORS={GENRE_COLORS}
-            loDocData={data2}
-            loDocErrors={errors2}
-            loDocConnection={connection2}
+            loDocData={data}
+            loDocErrors={errors}
+            loDocConnection={connection}
             documentIDS={documentIDS}
           />
         )}
