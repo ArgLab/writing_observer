@@ -43,6 +43,7 @@ document_access_ts = q.call('writing_observer.fetch_doc_at_timestamp')
 document_by_title_text = q.call('writing_observer.fetch_doc_by_title_text')
 
 source_selector = q.call('source_selector')
+single_student_from_roster = q.call('writing_observer.single_student_from_roster')
 
 # TODO each of these choices should come from an Enum
 pmss.parser('nlp_source', parent='string', choices=['nlp', 'nlp_sep_proc'], transform=None)
@@ -99,8 +100,9 @@ EXECUTION_DAG = {
         'student_with_docs': q.select(
             q.keys(
                 'writing_observer.document_list',
-                STUDENTS=q.parameter("student_id", required=True),
-                STUDENTS_path='user_id'
+                scope_fields={
+                    "student": q.parameter("student_id", required=True)
+                }
             ),
             fields={'docs': 'docs'}
         ),
@@ -108,12 +110,16 @@ EXECUTION_DAG = {
         'single_student_doc_by_id': q.select(
             q.keys(
                 'writing_observer.reconstruct',
-                STUDENTS=q.parameter("student_id", required=True),
-                STUDENTS_path='user_id',
-                RESOURCES=q.parameter("document", required=True),
-                RESOURCES_path='doc_id'
+                scope_fields={
+                    "student": q.parameter("student_id", required=True),
+                    "doc_id": q.parameter("doc_ids", default=[])
+                }
             ),
             fields={'text': 'text'}
+        ),
+        'single_student_profile': single_student_from_roster(
+            roster=q.variable('roster'),
+            student_id=q.parameter('student_id', required=True)
         ),
         "docs": q.select(
             q.keys(
@@ -224,7 +230,12 @@ EXECUTION_DAG = {
         },
         "single_student_doc_by_id": {
             "returns": "single_student_doc_by_id",
-            "parameters": ["student_id", "document"],
+            "parameters": ["student_id", "doc_ids"],
+            "output": ""
+        },
+        "single_student_profile": {
+            "returns": "single_student_profile",
+            "parameters": ["student_id"],
             "output": ""
         },
         "single_student_all_reconstruct": {
