@@ -515,17 +515,19 @@ export default function StudentDetailCompare({
             <div className="flex items-center gap-2">
               {[0, 1].map((i) => {
                 const id = Array.isArray(selectedEssays) ? selectedEssays[i] : undefined;
+                const meta = id ? docMetaById.get(String(id)) : null;
+                const displayName = meta?.title || (id ? `#${id}` : "—");
                 return (
                   <div
                     key={i}
-                    className={`h-8 px-3 rounded-full flex items-center gap-2 ${
+                    className={`h-8 px-3 rounded-full flex items-center gap-2 max-w-[220px] ${
                       id ? "bg-white text-emerald-700" : "bg-emerald-600 text-white/90"
                     }`}
                   >
-                    <span className="text-xs font-medium">{id ? `#${id}` : "—"}</span>
+                    <span className="text-xs font-medium truncate">{displayName}</span>
                     {id && (
                       <button
-                        className="p-0.5 rounded hover:bg-emerald-100"
+                        className="p-0.5 rounded hover:bg-emerald-100 flex-shrink-0"
                         onClick={() =>
                           safeSetSelectedEssays((prev) => (Array.isArray(prev) ? prev.filter((x) => x !== id) : []))
                         }
