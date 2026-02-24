@@ -104,7 +104,7 @@ EXECUTION_DAG = {
                     "student": q.parameter("student_id", required=True)
                 }
             ),
-            fields={'docs': 'docs'}
+            fields={'docs': 'documents'}
         ),
         # a single document by explicit doc id
         'single_student_doc_by_id': q.select(

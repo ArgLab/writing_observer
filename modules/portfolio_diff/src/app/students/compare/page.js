@@ -1145,7 +1145,7 @@ export default function EssayComparison() {
   });
 
   const availableDocIds = useMemo(() => {
-    const docsObj = loListData?.students?.[studentID]?.docs || {};
+    const docsObj = loListData?.students?.[studentID]?.documents || {};
     const ids = Object.keys(docsObj || {});
     ids.sort();
     return ids;

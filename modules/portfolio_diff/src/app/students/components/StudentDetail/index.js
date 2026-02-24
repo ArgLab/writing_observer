@@ -402,7 +402,7 @@ export default function StudentDetail({ studentId }) {
   });
 
   // ------ Derive docsObj & documentIDS from student_with_docs response ------
-  const docsObj = data?.students?.[studentID]?.docs || {};
+  const docsObj = data?.students?.[studentID]?.documents || {};
   const studentProfile = data?.students?.[studentID]?.profile?.name || {};
   const studentName = studentProfile?.full_name || studentProfile?.name || studentID;
 
