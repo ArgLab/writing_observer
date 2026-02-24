@@ -1345,8 +1345,11 @@ export default function EssayComparison() {
     const q = replaceQuery.trim().toLowerCase();
     const pool = availableDocIds || [];
     if (!q) return pool;
-    return pool.filter((id) => id.toLowerCase().includes(q));
-  }, [replaceQuery, availableDocIds]);
+    return pool.filter((id) => {
+      const title = docTitle(id).toLowerCase();
+      return title.includes(q) || id.toLowerCase().includes(q);
+    });
+  }, [replaceQuery, availableDocIds, docTitle]);
 
   const replacePick = (id) => {
     setDocIdForSide(replaceModal.side, id);
@@ -1515,7 +1518,7 @@ export default function EssayComparison() {
                     value={replaceQuery}
                     onChange={(e) => setReplaceQuery(e.target.value)}
                     autoFocus
-                    placeholder="Search by document id…"
+                    placeholder="Search by document…"
                     className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>

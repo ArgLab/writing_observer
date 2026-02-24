@@ -346,7 +346,7 @@ export default function WritingPortfolioDashboard() {
   const renderStatsRow = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
       {/* Total Students */}
-      <button className="text-left rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full bg-gradient-to-br from-emerald-500 to-emerald-600">
+      <div className="text-left rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full bg-gradient-to-br from-emerald-500 to-emerald-600">
         <p className="text-sm text-white mb-2 font-semibold">Total Students</p>
         <div className="flex justify-between items-center">
           <p className="text-4xl font-bold text-white">{metrics.totalStudents}</p>
@@ -354,10 +354,10 @@ export default function WritingPortfolioDashboard() {
             <Users className="h-6 w-6 text-emerald-600" />
           </div>
         </div>
-      </button>
+      </div>
 
       {/* Total Documents */}
-      <button className="text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full">
+      <div className="text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full">
         <p className="text-sm text-gray-600 mb-2 font-semibold">Total Documents</p>
         <div className="flex justify-between items-center">
           <p className="text-4xl font-bold text-gray-900">{metrics.totalDocuments}</p>
@@ -365,10 +365,10 @@ export default function WritingPortfolioDashboard() {
             <FileText className="h-6 w-6 text-emerald-600" />
           </div>
         </div>
-      </button>
+      </div>
 
       {/* Active last 7 days */}
-      <button className="text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full">
+      <div className="text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full">
         <p className="text-sm text-gray-600 mb-2 font-semibold">Active (Last 7 Days)</p>
         <div className="flex justify-between items-center">
           <p className="text-4xl font-bold text-gray-900">{metrics.active7d}</p>
@@ -376,10 +376,10 @@ export default function WritingPortfolioDashboard() {
             <Clock className="h-6 w-6 text-emerald-600" />
           </div>
         </div>
-      </button>
+      </div>
 
       {/* Roster coverage */}
-      <button className="text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full">
+      <div className="text-left bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow transition relative w-full">
         <p className="text-sm text-gray-600 mb-2 font-semibold">Roster Coverage</p>
         <div className="flex justify-between items-center">
           <p className="text-4xl font-bold text-gray-900">{metrics.coverage}%</p>
@@ -387,7 +387,7 @@ export default function WritingPortfolioDashboard() {
             <CheckCircle className="h-6 w-6 text-emerald-600" />
           </div>
         </div>
-      </button>
+      </div>
     </div>
   );
 

@@ -145,10 +145,25 @@ function LORunner({ wsUrl, dataScope, scopeKey, onData, onErrors }) {
 function buildEChartOption({ metricId, points }) {
   const labels = points.map((p) => p.label);
 
+  const values = points.map((p) => p.raw).filter(Number.isFinite);
+  const dataMin = values.length ? Math.min(...values) : 0;
+  const dataMax = values.length ? Math.max(...values) : 100;
+  const range = dataMax - dataMin;
+
+  // Add padding: 20% of range on each side, minimum ±5 percentage points
+  const padding = Math.max(range * 0.2, 5);
+  const yMin = Math.max(0, Math.floor((dataMin - padding) / 5) * 5);
+  const yMax = Math.min(100, Math.ceil((dataMax + padding) / 5) * 5);
+
+  // If all values are identical or very close, center around that value
+  const finalMin = yMin === yMax ? Math.max(0, yMin - 10) : yMin;
+  const finalMax = yMin === yMax ? Math.min(100, yMax + 10) : yMax;
+
   const barData = points.map((p) => ({
     value: p.barValue,
     docId: p.docId,
     label: p.label,
+    title: p.title,
     raw: p.raw,
   }));
 
@@ -156,6 +171,7 @@ function buildEChartOption({ metricId, points }) {
     value: p.value,
     docId: p.docId,
     label: p.label,
+    title: p.title,
     raw: p.raw,
   }));
 
@@ -176,12 +192,14 @@ function buildEChartOption({ metricId, points }) {
         const d = primary?.data || {};
         const pct = Number.isFinite(Number(d.raw)) ? Number(d.raw).toFixed(1) : "0.0";
         const docId = d.docId || "—";
-        const label = d.label || primary?.axisValue || "";
+        const title = d.title || "Untitled";
+        const date = d.label || primary?.axisValue || "";
 
         return `
           <div style="font-size:12px;">
             <div style="font-weight:600; margin-bottom:2px;">${metricId}</div>
-            <div style="color:#6b7280; margin-bottom:6px;">${label}</div>
+            <div style="font-weight:500; margin-bottom:2px;">${title}</div>
+            <div style="color:#6b7280; margin-bottom:6px;">${date}</div>
             <div>Coverage: <b>${pct}%</b></div>
             <div style="color:#6b7280; margin-top:4px;">Document: <span style="font-family:monospace;">${docId}</span></div>
           </div>
@@ -203,10 +221,11 @@ function buildEChartOption({ metricId, points }) {
 
     yAxis: {
       type: "value",
-      min: 0,
-      max: 100,
+      min: finalMin,
+      max: finalMax,
       axisLabel: { formatter: "{value}%" },
     },
+
     series: [
       {
         name: "Coverage (bar)",
@@ -265,7 +284,7 @@ export default function StudentDetailGrowth({
     return {
       wo: {
         execution_dag: "writing_observer",
-        target_exports: ["single_student_docs_with_nlp_annotations"],
+        target_exports: ["single_student_docs_with_nlp_annotations", 'student_with_docs'],
         kwargs: {
           course_id: courseId,
           student_id: studentID,
@@ -347,14 +366,17 @@ export default function StudentDetailGrowth({
         const essay = essaysInRangeAsc[i] || {};
         const label =
           (essay?.date && String(essay.date)) ||
-          (essay?.title && String(essay.title)) ||
           `Essay ${i + 1}`;
+        const title =
+          (essay?.title && String(essay.title)) ||
+          `Document ${i + 1}`;
 
         const raw = coveragePercentFromDoc(doc, metricId);
 
         points.push({
           idx: i,
           label,
+          title,
           docId,
           raw,
           value: raw,
