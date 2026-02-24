@@ -134,10 +134,10 @@ EXECUTION_DAG = {
         'single_student_docs_by_ids': q.select(
             q.keys(
                 'writing_observer.reconstruct',
-                STUDENTS=q.parameter("student_id", required=True),
-                STUDENTS_path='user_id',
-                RESOURCES=q.parameter("document", required=True),
-                RESOURCES_path='doc_id'
+                scope_fields={
+                    "student": q.parameter("student_id", required=True),
+                    "doc_id": q.parameter("document", default=[])
+                }
             ),
             fields={'text': 'text'}
         ),

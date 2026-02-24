@@ -88,9 +88,17 @@ export default function StudentDetailCompare({
       const text = typeof doc?.text === "string" ? doc.text : "";
       const words = text ? text.trim().split(/\s+/).filter(Boolean).length : 0;
 
-      const dateISO =
+      let dateISO =
         doc?.dateISO || doc?.date_iso || doc?.date || doc?.submitted_at || doc?.created_at || "";
 
+      if (!dateISO && doc?.last_access != null) {
+        const la = Number(doc.last_access);
+        if (Number.isFinite(la) && la > 0) {
+          // Handle both seconds and milliseconds timestamps
+          const ms = la > 1e12 ? la : la * 1000;
+          dateISO = new Date(ms).toISOString();
+        }
+      }
       const grade = doc?.grade ?? doc?.score ?? "";
       const tagsFromDoc = Array.isArray(doc?.tags)
         ? doc.tags

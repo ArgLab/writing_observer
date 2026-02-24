@@ -351,7 +351,7 @@ const buildEssaysFromDocs = ({ studentID, documentIDS, docsObj, data }) => {
    ============================================================= */
 
 export default function StudentDetail({ studentId }) {
-  console.count("StudentDetail render");
+  // console.count("StudentDetail render");
   const router = useRouter();
   const searchParams = useSearchParams();
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
   History,
@@ -10,7 +10,6 @@ import {
   Activity,
   Loader2,
   AlertTriangle,
-  Tag,
   SlidersHorizontal,
   ArrowUpDown,
 } from "lucide-react";
@@ -153,11 +152,7 @@ function initialsFromStudentKey(studentKey) {
    Charts (Auto-zoom for low ranges + delta annotation)
 ========================================================= */
 
-/**
- * Tick step selection for a given range.
- */
 function niceStep(range) {
-  // Handles % values. Favor readable tick increments.
   if (range <= 0.5) return 0.1;
   if (range <= 1) return 0.2;
   if (range <= 2) return 0.5;
@@ -179,13 +174,11 @@ function buildTicks(yMin, yMax, maxTicks = 5) {
     if (v >= yMin - 1e-9 && v <= yMax + 1e-9) ticks.push(Number(v.toFixed(3)));
   }
 
-  // If too many ticks, thin them.
   if (ticks.length > maxTicks) {
     const stride = Math.ceil(ticks.length / maxTicks);
     return ticks.filter((_, i) => i % stride === 0);
   }
 
-  // If too few ticks, ensure ends are present.
   if (!ticks.length) return [yMin, yMax];
   if (ticks[0] !== yMin) ticks.unshift(yMin);
   if (ticks[ticks.length - 1] !== yMax) ticks.push(yMax);
@@ -196,7 +189,6 @@ function BaselineCurrentChart({
   baselinePct,
   currentPct,
   height = 120,
-  // If true, will auto-zoom when values are in a narrow band.
   autoZoom = true,
 }) {
   const width = 520;
@@ -208,36 +200,25 @@ function BaselineCurrentChart({
   const b = Number.isFinite(baselinePct) ? Number(baselinePct) : 0;
   const c = Number.isFinite(currentPct) ? Number(currentPct) : 0;
 
-  // Compute delta annotations
   const deltaPP = c - b;
   const relDelta = b !== 0 ? (deltaPP / b) * 100 : null;
 
-  // Auto-zoom logic:
-  // - If values are both low and close, use a tighter y-range around them.
-  // - Always label when zoom is active.
   const minVal = Math.min(b, c);
   const maxVal = Math.max(b, c);
   const spread = maxVal - minVal;
 
   const shouldZoom =
-    autoZoom &&
-    // values are in lower part of scale OR range is very tight
-    (maxVal <= 15 || spread <= 3) &&
-    // but avoid zooming when values are near extremes where it could look odd
-    maxVal < 98;
+    autoZoom && (maxVal <= 15 || spread <= 3) && maxVal < 98;
 
   let yMin = 0;
   let yMax = 100;
   let zoomLabel = "";
 
   if (shouldZoom) {
-    // Pad around values so dots aren't hugging edges.
-    // Use a minimum window so it doesn't get too twitchy.
     const pad = Math.max(0.6, spread * 0.6);
     yMin = clamp(minVal - pad, 0, 100);
     yMax = clamp(maxVal + pad, 0, 100);
 
-    // Ensure a reasonable minimum span
     const minSpan = 4;
     if (yMax - yMin < minSpan) {
       const mid = (yMin + yMax) / 2;
@@ -245,13 +226,11 @@ function BaselineCurrentChart({
       yMax = clamp(mid + minSpan / 2, 0, 100);
     }
 
-    // Round bounds to nice steps
     const span = yMax - yMin;
     const step = niceStep(span);
     yMin = clamp(Math.floor(yMin / step) * step, 0, 100);
     yMax = clamp(Math.ceil(yMax / step) * step, 0, 100);
 
-    // If rounding collapsed the range, fallback
     if (yMax <= yMin) {
       yMin = clamp(minVal - 2, 0, 100);
       yMax = clamp(maxVal + 2, 0, 100);
@@ -273,14 +252,12 @@ function BaselineCurrentChart({
 
   const ticks = shouldZoom ? buildTicks(yMin, yMax, 5) : [0, 25, 50, 75, 100];
 
-  // For small spans, show one decimal tick labels; otherwise integer.
   const tickFmt = (v) => {
     const span = yMax - yMin;
     const needsDecimal = span <= 10 || shouldZoom;
     return `${needsDecimal ? Number(v).toFixed(1) : Number(v).toFixed(0)}%`;
   };
 
-  // Delta label text
   const deltaText = `${deltaPP >= 0 ? "+" : ""}${deltaPP.toFixed(1)} pp${
     relDelta === null ? "" : ` (${relDelta >= 0 ? "+" : ""}${relDelta.toFixed(0)}%)`
   }`;
@@ -293,19 +270,11 @@ function BaselineCurrentChart({
       role="img"
       aria-label="Baseline vs Current chart"
     >
-      {/* Grid + ticks */}
       {ticks.map((t) => {
         const y = Y(t);
         return (
           <g key={t}>
-            <line
-              x1={padL}
-              x2={width - padR}
-              y1={y}
-              y2={y}
-              stroke="rgb(226,232,240)"
-              strokeWidth="1"
-            />
+            <line x1={padL} x2={width - padR} y1={y} y2={y} stroke="rgb(226,232,240)" strokeWidth="1" />
             <text x={padL - 8} y={y + 4} textAnchor="end" fontSize="10" fill="rgb(100,116,139)">
               {tickFmt(t)}
             </text>
@@ -313,18 +282,9 @@ function BaselineCurrentChart({
         );
       })}
 
-      {/* Axes */}
       <line x1={padL} x2={padL} y1={padT} y2={height - padB} stroke="rgb(148,163,184)" strokeWidth="1" />
-      <line
-        x1={padL}
-        x2={width - padR}
-        y1={height - padB}
-        y2={height - padB}
-        stroke="rgb(148,163,184)"
-        strokeWidth="1"
-      />
+      <line x1={padL} x2={width - padR} y1={height - padB} y2={height - padB} stroke="rgb(148,163,184)" strokeWidth="1" />
 
-      {/* Axis labels */}
       <text x={xBaseline} y={height - 10} textAnchor="start" fontSize="10" fill="rgb(100,116,139)">
         Baseline
       </text>
@@ -332,31 +292,19 @@ function BaselineCurrentChart({
         Current
       </text>
 
-      {/* Zoom badge */}
       {shouldZoom ? (
         <g>
-          <rect
-            x={padL + 6}
-            y={padT + 2}
-            rx="6"
-            ry="6"
-            width="155"
-            height="18"
-            fill="rgb(241,245,249)"
-            stroke="rgb(226,232,240)"
-          />
+          <rect x={padL + 6} y={padT + 2} rx="6" ry="6" width="155" height="18" fill="rgb(241,245,249)" stroke="rgb(226,232,240)" />
           <text x={padL + 12} y={padT + 15} fontSize="10" fill="rgb(71,85,105)">
             {zoomLabel}
           </text>
         </g>
       ) : null}
 
-      {/* Slope line and points */}
       <line x1={xBaseline} x2={xCurrent} y1={yBaseline} y2={yCurrent} stroke="rgb(15,118,110)" strokeWidth="2" />
       <circle cx={xBaseline} cy={yBaseline} r="4" fill="rgb(148,163,184)" />
       <circle cx={xCurrent} cy={yCurrent} r="4.5" fill="rgb(190,24,93)" />
 
-      {/* Values */}
       <text x={xBaseline + 6} y={yBaseline - 6} textAnchor="start" fontSize="10" fill="rgb(71,85,105)">
         {b.toFixed(1)}%
       </text>
@@ -364,7 +312,6 @@ function BaselineCurrentChart({
         {c.toFixed(1)}%
       </text>
 
-      {/* Delta annotation centered */}
       <g>
         <rect
           x={(padL + (width - padR)) / 2 - 54}
@@ -591,35 +538,12 @@ function FeedbackControls({
           </div>
         </div>
 
-        <div className="text-[11px] text-gray-500">Tip: “Highest impact + Top 1 + Brief” works well for quick LMS comments.</div>
+        <div className="text-[11px] text-gray-500">
+          Tip: "Highest impact + Top 1 + Brief" works well for quick LMS comments.
+        </div>
       </div>
     </div>
   );
-}
-
-/* =========================================================
-   LO runner (hook lives here)
-   Remounting this component forces a fresh subscription/request.
-========================================================= */
-
-function LORunner({ url, dataScope, onData, onErrors, scopeKey }) {
-  const { data, errors } = useLOConnectionDataManager({ url, dataScope });
-
-  useEffect(() => {
-    onData?.(data);
-  }, [data, onData]);
-
-  useEffect(() => {
-    onErrors?.(errors);
-  }, [errors, onErrors]);
-
-  useEffect(() => {
-    if (!DEBUG) return;
-    console.log("[LORunner] mounted scopeKey:", scopeKey);
-    return () => console.log("[LORunner] unmounted scopeKey:", scopeKey);
-  }, [scopeKey]);
-
-  return null;
 }
 
 /* =========================================================
@@ -652,9 +576,8 @@ export function SingleEssayModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const avatar = initialsFromStudentKey(studentKey);
   const title = docTitle || (docIndex ? `Document ${docIndex}` : "Document");
-  const subtitle = `• Document • ${studentKey || "—"}${subtitleDate ? ` • ${subtitleDate}` : ""}`;
+  const subtitle = subtitleDate ? `Document • ${subtitleDate}` : "Document";
 
   return (
     <div className="fixed inset-0 z-50">
@@ -668,10 +591,6 @@ export function SingleEssayModal({
           <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-6 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center font-bold">
-                  {avatar}
-                </div>
-
                 <div className="min-w-0">
                   <div className="text-lg font-bold truncate">{title}</div>
                   <div className="text-sm text-white/90 truncate">{subtitle}</div>
@@ -708,10 +627,6 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
   const [activeTab, setActiveTab] = useState("trajectory");
   const [feedbackMode, setFeedbackMode] = useState("product");
   const [selectedMetrics, setSelectedMetricsState] = useState(["academic_language"]);
-
-  // LO outputs stored in state (decouple UI from hook internals)
-  const [loData, setLoData] = useState(null);
-  const [loErrors, setLoErrors] = useState(null);
 
   // feedback controls
   const [detailLevel, setDetailLevel] = useState("standard");
@@ -754,41 +669,40 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
         target_exports: ["single_student_docs_with_nlp_annotations"],
         kwargs: {
           course_id: courseId,
-          student_id: docIds.map(() => ({ user_id: studentKey })),
-          document: docIds.map((d) => ({ doc_id: d })),
+          student_id: studentKey,
+          document: docIds,
           nlp_options: selectedMetrics,
         },
       },
     };
   }, [exportEnabled, courseId, docIds, selectedMetrics, studentKey]);
 
-  // The key that forces LORunner (and hook) remount
-  const scopeKey = useMemo(() => {
-    const signature = {
-      exportEnabled,
-      studentKey,
-      docId,
-      docIds,
-      selectedMetrics,
-      target_exports: dataScope?.wo?.target_exports || [],
-    };
-    return stableStringify(signature);
-  }, [exportEnabled, studentKey, docId, docIds, selectedMetrics, dataScope]);
+  // Connect to LO websocket
+  const origin =
+    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
+    getWsOriginFromWindow() ||
+    "ws://localhost:8888";
 
-  useEffect(() => {
-    if (!DEBUG) return;
-    console.groupCollapsed("[SingleEssayInnerModal] scopeKey changed -> forcing LO remount");
-    console.log("scopeKey:", scopeKey);
-    console.log("dataScope:", dataScope);
-    console.groupEnd();
-  }, [scopeKey, dataScope]);
+  const url = `${origin}/wsapi/communication_protocol`;
+  const { connection, data: loData, errors: loErrors } = useLOConnectionDataManager({ url, dataScope });
 
-  // reset outputs on a new scope
+  // When dataScope changes, send the new scope over the existing connection
+  const prevScopeRef = useRef(null);
   useEffect(() => {
-    if (!exportEnabled) return;
-    setLoData(null);
-    setLoErrors(null);
-  }, [scopeKey, exportEnabled]);
+    if (!connection || !exportEnabled) return;
+
+    const scopeStr = stableStringify(dataScope);
+    if (scopeStr === prevScopeRef.current) return;
+    prevScopeRef.current = scopeStr;
+
+    if (DEBUG) {
+      console.groupCollapsed("[SingleEssayInnerModal] sending updated dataScope");
+      console.log("dataScope:", dataScope);
+      console.groupEnd();
+    }
+
+    connection.sendMessage(JSON.stringify(dataScope));
+  }, [connection, dataScope, exportEnabled]);
 
   const docsObj = useMemo(() => loData?.students?.[studentKey]?.documents || {}, [loData, studentKey]);
 
@@ -853,7 +767,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
       {
         category: "organization",
         heading: "Use a stronger paragraph map",
-        why: "Paragraph purposes aren’t clearly signposted.",
+        why: "Paragraph purposes aren't clearly signposted.",
         suggestion: "Add a 1-sentence topic line at the start of each paragraph to guide the reader.",
         evidence: { cues: [{ label: "Weak topic sentences", sub: "Paragraph goals inferred rather than stated." }] },
         impact: 0.75,
@@ -862,7 +776,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
         category: "evidence",
         heading: "Connect evidence to the claim explicitly",
         why: "Evidence is present, but the link back to the thesis is implicit.",
-        suggestion: "After each quote/example, add one sentence: “This shows ___ because ___.”",
+        suggestion: 'After each quote/example, add one sentence: "This shows ___ because ___."',
         evidence: { cues: [{ label: "Evidence-to-claim bridge", sub: "Explanation is shorter than evidence in places." }] },
         impact: 0.7,
       },
@@ -889,7 +803,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
         category: "focus",
         heading: "Avoid long uninterrupted drafting runs",
         why: "Long runs often reduce clarity and increase later cleanup work.",
-        suggestion: "Try a short checkpoint every 5–7 minutes: “Does this paragraph support my claim?”",
+        suggestion: 'Try a short checkpoint every 5–7 minutes: "Does this paragraph support my claim?"',
         evidence: { features: [{ name: "Longest uninterrupted run (min)", baseline: 9.2, current: 14.8, score: 55 }] },
         impact: 0.6,
       },
@@ -900,7 +814,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
 
   const applyDetailLevel = (b) => {
     if (detailLevel === "brief") {
-      return { ...b, why: "" }; // brief removes the “why” sentence
+      return { ...b, why: "" };
     }
     return b;
   };
@@ -924,57 +838,34 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
     return blocks;
   }, [feedbackBlocks, feedbackMode, ordering, priority]);
 
-  const origin =
-    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
-    getWsOriginFromWindow() ||
-    "ws://localhost:8888";
-
   return (
     <div className="bg-gray-50 h-full flex flex-col min-h-0">
-      {/* Hidden runner that forces re-run by remounting on scopeKey changes */}
-      {exportEnabled ? (
-        <LORunner
-          key={scopeKey}
-          scopeKey={scopeKey}
-          url={`${origin}/wsapi/communication_protocol`}
-          dataScope={dataScope}
-          onData={(d) => setLoData(d)}
-          onErrors={(e) => setLoErrors(e)}
-        />
-      ) : null}
-
+      {/* Tab bar */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="px-6 py-4 flex items-center justify-between gap-3">
-          <div className="text-sm text-gray-600">
-            Essay: <span className="font-semibold text-gray-900">{docId}</span> •{" "}
-            <span className="font-semibold text-gray-900">{wordCount.toLocaleString()}</span> words
-          </div>
+        <div className="px-6 py-3 flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("trajectory")}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border ${
+              activeTab === "trajectory"
+                ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <History className="h-4 w-4" />
+            Writing Trajectory
+          </button>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab("trajectory")}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border ${
-                activeTab === "trajectory"
-                  ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-                  : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <History className="h-4 w-4" />
-              Writing Trajectory
-            </button>
-
-            <button
-              onClick={() => setActiveTab("feedback")}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border ${
-                activeTab === "feedback"
-                  ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-                  : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <Sparkles className="h-4 w-4" />
-              Actionable Feedback
-            </button>
-          </div>
+          <button
+            onClick={() => setActiveTab("feedback")}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border ${
+              activeTab === "feedback"
+                ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            Actionable Feedback
+          </button>
         </div>
       </div>
 
@@ -1002,31 +893,14 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
             </div>
           </aside>
 
-          {/* Middle column: essay */}
+          {/* Middle column: essay text */}
           <section className="lg:col-span-4 h-full min-h-0 flex flex-col">
             <div className="flex-1 min-h-0 overflow-auto pb-4 pr-1">
               <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-p font-semibold text-gray-900 truncate">Essay</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                          <Tag className="h-3.5 w-3.5" />
-                          Tags
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 ring-1 ring-gray-200 text-xs">
-                          Document
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0">
-                      <span className="px-2 py-1 text-xs font-semibold rounded-xl bg-white border border-gray-200">
-                        {wordCount.toLocaleString()} words
-                      </span>
-                    </div>
-                  </div>
+                <div className="px-5 py-3 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between">
+                  <span className="px-2 py-1 text-xs font-semibold rounded-xl bg-white border border-gray-200">
+                    {wordCount.toLocaleString()} words
+                  </span>
                 </div>
 
                 <div className="px-5 py-4">
@@ -1081,7 +955,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
                     <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
                       <div className="flex items-center gap-2 text-sm font-semibold text-rose-900">
                         <AlertTriangle className="h-4 w-4" />
-                        Couldn’t compute trajectory
+                        Couldn't compute trajectory
                       </div>
                       <pre className="mt-3 text-[11px] leading-4 text-rose-900/80 bg-white/40 border border-rose-200 rounded-xl p-3 overflow-auto max-h-40">
                         {JSON.stringify(loErrors, null, 2)}
@@ -1091,18 +965,13 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
                     <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center">
                       <div className="mt-1 text-sm font-semibold text-gray-900">No prior data to compare with</div>
                       <div className="mt-1 text-sm text-gray-600">
-                        This is the student’s first essay in the trajectory sequence, so we can’t compute a baseline yet.
+                        This is the student's first essay in the trajectory sequence, so we can't compute a baseline yet.
                       </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-3">
                       {metricSummaries.map((m) => (
-                        <MetricTile
-                          key={m.key}
-                          metricKey={m.key}
-                          baseline={m.baseline}
-                          currentValue={m.currentValue}
-                        />
+                        <MetricTile key={m.key} metricKey={m.key} baseline={m.baseline} currentValue={m.currentValue} />
                       ))}
                     </div>
                   )}
@@ -1157,7 +1026,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
                     <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center">
                       <div className="mt-1 text-sm font-semibold text-gray-900">No feedback items available</div>
                       <div className="mt-1 text-sm text-gray-600">
-                        Try switching Product/Process or set Priority to “All”.
+                        Try switching Product/Process or set Priority to "All".
                       </div>
                     </div>
                   ) : (
@@ -1178,17 +1047,13 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
                           {feedbackMode === "product" ? (
                             includeEvidence ? (
                               <div className="mt-3">
-                                <div className="text-xs text-gray-500 font-medium mb-1">
-                                  Evidence (justification)
-                                </div>
+                                <div className="text-xs text-gray-500 font-medium mb-1">Evidence (justification)</div>
                                 <EvidenceProduct cues={b.evidence?.cues} />
                               </div>
                             ) : null
                           ) : includeProcessSignals ? (
                             <div className="mt-3">
-                              <div className="text-xs text-gray-500 font-medium mb-1">
-                                Evidence (process signals)
-                              </div>
+                              <div className="text-xs text-gray-500 font-medium mb-1">Evidence (process signals)</div>
                               <EvidenceProcess features={b.evidence?.features} />
                             </div>
                           ) : null}

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/components/components.jsx";
+import { useLOConnectionDataManager, LOConnectionLastUpdated } from "lo_event/lo_event/lo_assess/components/components.jsx";
 import dynamic from "next/dynamic";
 
 import { MetricsPanel } from "@/app/components/MetricsPanel";
@@ -887,13 +887,13 @@ function readCompareParamsFromLocation() {
   return { urlReady: true, studentID, docIds };
 }
 
-function buildEssayFromDoc({ docId, text, side }) {
+function buildEssayFromDoc({ docId, text, side, title }) {
   const content = (text || "").trim();
   const words = content ? content.split(/\s+/).filter(Boolean).length : 0;
 
   return {
     id: docId || `${side}-unknown`,
-    title: docId ? `Document: ${docId}` : `Document (${side})`,
+    title: title || (docId ? `Document: ${docId}` : `Document (${side})`),
     date: "",
     minutes: Math.max(10, Math.round(words / 30)),
     words,
@@ -1109,51 +1109,14 @@ export default function EssayComparison() {
     "paragraphs",
   ]);
 
-  /* ---------------------- Available docs list (for replacement selection) ---------------------- */
-  const docsListEnabled = urlReady && !!studentID;
-
-  const dataScopeList = useMemo(() => {
-    if (!docsListEnabled) {
-      return {
-        wo: {
-          execution_dag: "writing_observer",
-          target_exports: [],
-          kwargs: {},
-        },
-      };
-    }
-    return {
-      wo: {
-        execution_dag: "writing_observer",
-        target_exports: ["student_with_docs"],
-        kwargs: {
-          course_id: courseId,
-          student_id: studentID,
-        },
-      },
-    };
-  }, [courseId, docsListEnabled, studentID]);
-
+  /* ---------------------- comparison data fetch ---------------------- */
   const origin =
     process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
     getWsOriginFromWindow() ||
     "ws://localhost:8888";
 
-  const { data: loListData } = useLOConnectionDataManager({
-    url: `${origin}/wsapi/communication_protocol`,
-    dataScope: dataScopeList,
-  });
-
-  const availableDocIds = useMemo(() => {
-    const docsObj = loListData?.students?.[studentID]?.documents || {};
-    const ids = Object.keys(docsObj || {});
-    ids.sort();
-    return ids;
-  }, [loListData, studentID]);
-
-  /* ---------------------- comparison data fetch ---------------------- */
   const dataScope = useMemo(() => {
-    if (!enabled) {
+    if (!urlReady || !studentID) {
       return {
         wo: {
           execution_dag: "writing_observer",
@@ -1163,25 +1126,65 @@ export default function EssayComparison() {
       };
     }
 
+    const target_exports = ["student_with_docs", "single_student_profile"];
+
+    // Only add NLP annotation export when we have 2 docs selected
+    if (docIds.length === 2 && docIds[0] && docIds[1]) {
+      target_exports.push("single_student_docs_with_nlp_annotations");
+    }
+
     return {
       wo: {
         execution_dag: "writing_observer",
-        target_exports: ["single_student_docs_with_nlp_annotations"],
+        target_exports,
         kwargs: {
           course_id: courseId,
-          student_id: docIds.map(() => ({ user_id: studentID })),
-          document: docIds.map((doc_id) => ({ doc_id })),
-          nlp_options: selectedMetrics,
+          student_id: studentID,
+          ...(docIds.length === 2 && docIds[0] && docIds[1]
+            ? {
+                document: docIds,
+                nlp_options: selectedMetrics,
+              }
+            : {}),
         },
       },
     };
-  }, [enabled, courseId, docIds, selectedMetrics, studentID]);
+  }, [urlReady, studentID, courseId, docIds, selectedMetrics]);
 
   const { data: loData, errors: loErrors, connection: loConnection } = useLOConnectionDataManager({
-    url: "ws://localhost:8888/wsapi/communication_protocol",
+    url: `${origin}/wsapi/communication_protocol`,
     dataScope,
   });
 
+  /* ---------------------- Available docs list (for replacement selection) ---------------------- */
+  const availableDocIds = useMemo(() => {
+    const docsObj = loData?.students?.[studentID]?.documents || {};
+    const ids = Object.keys(docsObj || {});
+    ids.sort();
+    return ids;
+  }, [loData, studentID]);
+
+  useEffect(() => {
+    if (loConnection && loConnection.sendMessage && dataScope?.wo?.target_exports?.length > 0) {
+      try {
+        loConnection.sendMessage(JSON.stringify(dataScope));
+      } catch (e) {
+        console.warn("Failed to resend dataScope:", e);
+      }
+    }
+  }, [dataScope, loConnection]);
+
+  const docTitle = useCallback(
+    (docId) => {
+      if (!docId) return "—";
+      const doc = loData?.students?.[studentID]?.documents?.[docId];
+      return doc?.title || docId;
+    },
+    [loData, studentID]
+  );
+
+  const studentProfile = loData?.students?.[studentID];
+  const studentDisplayName = studentProfile?.profile?.name?.full_name || studentID || "—";
   const docsObj = loData?.students?.[studentID]?.documents || {};
   const leftDoc = leftDocId ? docsObj?.[leftDocId] : null;
   const rightDoc = rightDocId ? docsObj?.[rightDocId] : null;
@@ -1206,17 +1209,17 @@ export default function EssayComparison() {
   const [rightEssay, setRightEssay] = useState(() => buildEssayFromDoc({ docId: rightDocId, text: "", side: "right" }));
 
   useEffect(() => {
-    setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: "", side: "left" }));
-    setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: "", side: "right" }));
+    setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: "", side: "left", title: docTitle(leftDocId) }));
+    setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: "", side: "right", title: docTitle(rightDocId) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leftDocId, rightDocId]);
+  }, [leftDocId, rightDocId, docTitle]);
 
   useEffect(() => {
     if (!enabled) return;
-    if (leftHasTextField) setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: leftText, side: "left" }));
-    if (rightHasTextField) setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: rightText, side: "right" }));
+    if (leftHasTextField) setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: leftText, side: "left", title: docTitle(leftDocId) }));
+    if (rightHasTextField) setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: rightText, side: "right", title: docTitle(rightDocId) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, leftHasTextField, rightHasTextField, leftDocId, rightDocId, leftText, rightText]);
+  }, [enabled, leftHasTextField, rightHasTextField, leftDocId, rightDocId, leftText, rightText, docTitle]);
 
   /* ---------------------- CUSTOM TOOLTIP STATE ---------------------- */
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, content: "" });
@@ -1493,11 +1496,11 @@ export default function EssayComparison() {
                     Replace {replaceModal.side === "left" ? "Left" : "Right"} document
                   </div>
                   <div className="mt-1 text-xs text-gray-500">
-                    Student: <span className="font-mono text-gray-700">{studentID}</span>
+                    Student: <span className="font-medium text-gray-700">{studentDisplayName}</span>
                     {" • "}
                     Docs: <span className="font-medium text-gray-700">{availableDocIds.length}</span>
                     {" • "}
-                    Current: <span className="font-mono text-gray-700">{currentIdForSide || "—"}</span>
+                    Current: <span className="font-medium text-gray-700">{docTitle(currentIdForSide)}</span>
                   </div>
                 </div>
                 <button onClick={closeReplace} className="p-2 rounded-lg hover:bg-gray-50" aria-label="Close">
@@ -1536,7 +1539,10 @@ export default function EssayComparison() {
                         onMouseEnter={() => setReplaceActiveIdx(idx)}
                         className={`w-full text-left px-4 py-3 flex items-center gap-3 ${isActive ? "bg-emerald-50" : "hover:bg-gray-50"}`}
                       >
-                        <span className="font-mono text-xs text-gray-800">{id}</span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{docTitle(id)}</div>
+                          <div className="text-xs text-gray-500 font-mono truncate">{id}</div>
+                        </div>
 
                         <div className="ml-auto flex items-center gap-2">
                           {isCurrent && (
@@ -1586,7 +1592,19 @@ export default function EssayComparison() {
                 navigateTo("students", { student_id: studentID });
               }}
             >
-              {studentID || "—"}
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold"
+                >
+                  {studentDisplayName
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)}
+                </span>
+                {studentDisplayName}
+              </span>
             </li>
             <li className="text-gray-400">›</li>
             <li className="text-gray-900 font-semibold">Essay Comparison</li>
@@ -1598,12 +1616,9 @@ export default function EssayComparison() {
             Missing URL params. Expected: <span className="font-mono">?student_id=...&ids=docA,docB</span>
           </div>
         ) : null}
-
         {urlReady ? (
           <div className="mb-4 text-xs text-gray-600">
-            ids: <span className="font-mono">{docIds.join(", ")}</span>
-            {loConnection?.status ? <span> • ws: {String(loConnection.status)}</span> : null}
-            {availableDocIds.length ? <span> • available docs: {availableDocIds.length}</span> : null}
+            <LOConnectionLastUpdated message={loData} connectionStatus={loConnection.connectionStatus} showText />
           </div>
         ) : null}
       </div>

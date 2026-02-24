@@ -268,8 +268,8 @@ export default function StudentDetailGrowth({
         target_exports: ["single_student_docs_with_nlp_annotations"],
         kwargs: {
           course_id: courseId,
-          student_id: docIdsAsc.map(() => ({ user_id: studentID })),
-          document: docIdsAsc.map((doc_id) => ({ doc_id })),
+          student_id: studentID,
+          document: docIdsAsc,
           nlp_options: selectedMetrics,
         },
       },
