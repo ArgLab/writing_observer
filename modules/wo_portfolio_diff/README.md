@@ -45,3 +45,12 @@ The `-e` flag installs the package in editable (development) mode, meaning chang
 | Build | `npm run build` | Compile the frontend into `out/` |
 | Sync | `cp -r out/ ../wo_portfolio_diff/...` | Update bundled assets in this package |
 | Install | `pip install -e modules/wo_portfolio_diff` | Install the package locally |
+
+### ENV Variables
+
+To set environment variables at build time, add them to a `.env.production` file. The build command will load these in.
+
+| Env | Purpose |
+|-----|---------|
+| NEXT_PUBLIC_LO_WS_ORIGIN | Where to point communication protocol queries. |
+
