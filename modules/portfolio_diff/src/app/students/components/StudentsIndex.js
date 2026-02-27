@@ -641,11 +641,13 @@ export default function WritingPortfolioDashboard() {
                 Welcome back! <span className="inline-block">👋</span>
               </h1>
               <p className="mt-2 text-gray-600">A snapshot of your class writing activity and progress.</p>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-500">
-                <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1">📚 English 10A</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1">📅 Fall 2025</span>
-              </div>
+              {/* TODO implement meaningful tags for the current course being shown */}
+              {false && (
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1">📚 English 10A</span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1">📅 Fall 2025</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
