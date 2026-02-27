@@ -718,6 +718,9 @@ export default function StudentDetail({ studentId }) {
             <p className="mt-1 text-xs/6 text-emerald-50">Available documents</p>
           </div>
 
+        {/* TODO: Populate top summary cards with real student analytics data, then re-enable this section. */}
+        {false && (
+          <>
           <div className="rounded-2xl p-6 py-4 bg-white border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium text-gray-600">Most Improved</p>
@@ -753,6 +756,8 @@ export default function StudentDetail({ studentId }) {
             <p className="text-3xl font-bold text-gray-900">—</p>
             <p className="mt-2 text-xs text-gray-500">(Not available yet)</p>
           </div>
+          </>
+        )}
         </div>
 
         <div className="mb-4">
