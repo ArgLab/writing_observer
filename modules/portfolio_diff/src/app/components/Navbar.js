@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   Search,
@@ -10,15 +9,51 @@ import {
   Menu,
   X,
   BookOpen,
-  Settings,
   LogOut,
+  Link,
+  Home
 } from "lucide-react";
 import { navigateTo } from "../utils/navigation";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);          // mobile sheet
   const [menuOpen, setMenuOpen] = useState(false);  // desktop profile menu
+  const [courseDashboards, setCourseDashboards] = useState([]);
   const menuRef = useRef(null);
+
+  const dashboardLinks = [
+    { name: "Home", url: "/", preserveHash: false },
+    ...courseDashboards.map((dashboard) => ({
+      ...dashboard,
+      preserveHash: true,
+    })),
+  ];
+
+  const getDashboardHref = (dashboard) => {
+    if (typeof window === "undefined") return dashboard.url;
+
+    if (!dashboard.preserveHash) return dashboard.url;
+    return `${dashboard.url}${window.location.hash || ""}`;
+  };
+
+  useEffect(() => {
+    const loadCourseDashboards = async () => {
+      try {
+        const response = await fetch("/webapi/course_dashboards");
+        if (!response.ok) return;
+        const dashboards = await response.json();
+        if (!Array.isArray(dashboards)) return;
+
+        setCourseDashboards(
+          dashboards.filter((dashboard) => dashboard?.name && dashboard?.url)
+        );
+      } catch {
+        setCourseDashboards([]);
+      }
+    };
+
+    loadCourseDashboards();
+  }, []);
 
   // Close profile menu on outside click
   useEffect(() => {
@@ -52,13 +87,16 @@ export default function Navbar() {
 
         {/* Right: actions */}
         <div className="flex items-center gap-2">
-          <button
-            aria-label="Notifications"
-            className="relative rounded-full p-2 text-zinc-200 hover:bg-white/10 hover:text-white"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-500" />
-          </button>
+          {/* TODO implement notifications */}
+          {false && (
+            <button
+              aria-label="Notifications"
+              className="relative rounded-full p-2 text-zinc-200 hover:bg-white/10 hover:text-white"
+            >
+              <Bell className="h-5 w-5" />
+              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-500" />
+            </button>
+          )}
 
           {/* Profile (desktop) */}
           <div className="relative hidden md:block" ref={menuRef}>
@@ -69,9 +107,9 @@ export default function Navbar() {
               className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-sm text-zinc-200 hover:bg-white/10"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600/20 ring-1 ring-emerald-500/40">
-                <User className="h-4 w-4 text-emerald-300" />
+                <Link className="h-4 w-4 text-emerald-300" />
               </div>
-              <span className="pr-1 text-white">Your Account</span>
+              <span className="pr-1 text-white">Dashboards</span>
               <ChevronDown
                 className={`h-4 w-4 text-zinc-400 group-hover:text-zinc-300 transition-transform ${
                   menuOpen ? "rotate-180" : ""
@@ -86,27 +124,28 @@ export default function Navbar() {
                 aria-label="Profile"
                 className="absolute right-0 mt-2 w-48 overflow-hidden rounded-lg border border-white/10 bg-emerald-900/95 backdrop-blur shadow-lg"
               >
-                <button
-                  role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-100 hover:bg-white/10"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <User className="h-4 w-4 opacity-90" />
-                  View Profile
-                </button>
-                <button
-                  role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-100 hover:bg-white/10"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <Settings className="h-4 w-4 opacity-90" />
-                  Settings
-                </button>
+                {dashboardLinks.map((dashboard, idx) => (
+                  <a
+                    key={`${dashboard.url}-${dashboard.name}`}
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-100 hover:bg-white/10"
+                    href={getDashboardHref(dashboard)}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {idx === 0 ? (
+                      <Home className="h-4 w-4 opacity-90" />
+                    ) : (
+                      <User className="h-4 w-4 opacity-90" />
+                    )}
+                    {dashboard.name}
+                  </a>
+                ))}
                 <button
                   role="menuitem"
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-100 hover:bg-white/10"
                   onClick={() => {
                     setMenuOpen(false);
+                    window.location.assign("/auth/logout");
                   }}
                 >
                   <LogOut className="h-4 w-4 opacity-90" />
@@ -148,35 +187,30 @@ export default function Navbar() {
             <div className="flex items-center justify-between px-3 py-2">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600/20 ring-1 ring-emerald-500/40">
-                  <User className="h-4 w-4 text-emerald-300" />
+                  <Link className="h-4 w-4 text-emerald-300" />
                 </div>
                 <div>
-                  <p className="text-sm text-white">Your Account</p>
-                  <p className="text-xs text-zinc-400">Mentor</p>
+                  <p className="text-sm text-white">Dashboards</p>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 divide-y divide-white/10">
-              <Link
-                href="/profile"
-                className="px-3 py-2 text-sm text-zinc-100 hover:bg-white/10"
-                onClick={() => setOpen(false)}
-              >
-                View Profile
-              </Link>
-              <Link
-                href="/settings"
-                className="px-3 py-2 text-sm text-zinc-100 hover:bg-white/10"
-                onClick={() => setOpen(false)}
-              >
-                Settings
-              </Link>
+              {dashboardLinks.map((dashboard) => (
+                <a
+                  key={`${dashboard.url}-mobile-${dashboard.name}`}
+                  href={getDashboardHref(dashboard.url)}
+                  className="px-3 py-2 text-sm text-zinc-100 hover:bg-white/10"
+                  onClick={() => setOpen(false)}
+                >
+                  {dashboard.name}
+                </a>
+              ))}
               <button
                 className="px-3 py-2 text-left text-sm text-red-100 hover:bg-white/10"
                 onClick={() => {
                   setOpen(false);
-                  // Hook your logout here
+                  window.location.assign("/auth/logout");
                 }}
               >
                 Logout
