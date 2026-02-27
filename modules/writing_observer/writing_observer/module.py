@@ -11,8 +11,11 @@ This may be an examplar for building new modules too.
 # files.
 import pmss
 
+import learning_observer.communication_protocol.integration
 import learning_observer.communication_protocol.query as q
+import learning_observer.constants as constants
 import learning_observer.settings
+import learning_observer.rosters
 
 from learning_observer import downloads as d
 
@@ -25,6 +28,16 @@ from writing_observer.nlp_indicators import INDICATOR_JSONS
 
 
 NAME = "The Writing Observer"
+
+@learning_observer.communication_protocol.integration.publish_function('writing_observer.roster_with_provenance')
+async def roster_with_provenance(roster, course_id):
+    """Fetch roster entries and add STUDENT provenance for protocol consumers."""
+    for student in roster:
+        if constants.USER_ID not in student:
+            continue
+        student['provenance'] = {'STUDENT': {constants.USER_ID: student[constants.USER_ID]}}
+    return roster
+
 
 # things that process data versus things that interact with the environment
 # side-effects or not
@@ -96,6 +109,7 @@ document_sources = source_selector(
 EXECUTION_DAG = {
     "execution_dag": {
         "roster": course_roster(runtime=q.parameter("runtime"), course_id=q.parameter("course_id", required=True)),
+        "roster_with_provenance": q.call('writing_observer.roster_with_provenance')(roster=q.variable('roster'), course_id=q.parameter("course_id", required=True)),
         # all documents for a student
         'student_with_docs': q.select(
             q.keys(
@@ -118,16 +132,16 @@ EXECUTION_DAG = {
             fields={'text': 'text'}
         ),
         'single_student_profile': single_student_from_roster(
-            roster=q.variable('roster'),
+            roster=q.variable('roster_with_provenance'),
             student_id=q.parameter('student_id', required=True)
         ),
         "docs": q.select(
             q.keys(
-                'writing_observer.reconstruct', 
-                STUDENTS=q.variable("roster"), 
-                STUDENTS_path='user_id', 
-                RESOURCES=q.variable("update_docs"), 
-                RESOURCES_path='doc_id'
+                'writing_observer.reconstruct',
+                scope_fields={
+                    "student": {"values": q.variable("roster"), "path": "user_id"},
+                    "doc_id": {"values": q.variable("update_docs"), "path": "doc_id"}
+                }
             ), 
             fields={'text': 'text'}
         ),
@@ -147,7 +161,7 @@ EXECUTION_DAG = {
         ),
         "doc_ids": q.select(q.keys('writing_observer.last_document', STUDENTS=q.variable("roster"), STUDENTS_path='user_id'), fields={'document_id': 'doc_id'}),
         'update_docs': update_via_google(runtime=q.parameter("runtime"), doc_ids=q.variable('doc_sources')),
-        "docs": q.select(q.keys('writing_observer.reconstruct', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("update_docs"), RESOURCES_path='doc_id'), fields={'text': 'text'}),
+
         "docs_combined": q.join(LEFT=q.variable("docs"), RIGHT=q.variable("roster"), LEFT_ON='provenance.provenance.STUDENT.value.user_id', RIGHT_ON='user_id'),
         'nlp': process_texts(writing_data=q.variable('docs'), options=q.parameter('nlp_options', required=False, default=[])),
         'nlp_sep_proc': q.select(q.keys('writing_observer.nlp_components', STUDENTS=q.variable('roster'), STUDENTS_path='user_id', RESOURCES=q.variable("doc_ids"), RESOURCES_path='doc_id'), fields='All'),
@@ -219,7 +233,7 @@ EXECUTION_DAG = {
             "output": ""
         },
         "roster": {
-            "returns": "roster",
+            "returns": "roster_with_provenance",
             "parameters": ["course_id"],
             "output": ""
         },
