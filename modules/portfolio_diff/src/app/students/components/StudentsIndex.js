@@ -480,7 +480,7 @@ export default function WritingPortfolioDashboard() {
               ].map((c) => (
                 <th
                   key={c.key}
-                  className={`px-6 py-3 ${c.align} text-xs font-semibold text-gray-500 uppercase tracking-wider`}
+                  className={`px-6 py-3 ${c.align} text-xs font-semibold text-gray-500 uppercase tracking-wider ${c.key === "id" ? "hidden": ""}`}
                 >
                   <button
                     onClick={() => toggleSort(c.key)}
@@ -527,7 +527,7 @@ export default function WritingPortfolioDashboard() {
                   />
                 </td>
 
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 hidden">
                   <span className="text-sm text-gray-900">{student.id}</span>
                 </td>
 
