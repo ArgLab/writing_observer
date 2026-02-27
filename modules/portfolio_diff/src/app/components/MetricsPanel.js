@@ -686,6 +686,9 @@ export function MetricsPanel({
   // Optional UI knobs
   stickyTopClassName = "top-24",
   title = "Metrics",
+  className = "",
+  panelClassName = "",
+  useSticky = true,
 }) {
   const selectedMetrics = Array.isArray(metrics) ? metrics : [];
   const setSelectedMetrics = typeof setMetrics === "function" ? setMetrics : () => {};
@@ -766,9 +769,11 @@ export function MetricsPanel({
   const selectedCount = selectedMetrics.length;
 
   return (
-    <aside className="col-span-12 md:col-span-4 xl:col-span-3">
+    <aside className={`col-span-12 md:col-span-4 xl:col-span-3 ${className}`.trim()}>
       <div
-        className={`bg-white rounded-2xl border border-gray-200 p-5 shadow-sm sticky ${stickyTopClassName} h-fit`}
+        className={`bg-white rounded-2xl border border-gray-200 p-5 shadow-sm h-fit ${
+          useSticky ? `sticky ${stickyTopClassName}` : ""
+        } ${panelClassName}`.trim()}
       >
         {/* -------- Presets -------- */}
         <div className="mb-5">

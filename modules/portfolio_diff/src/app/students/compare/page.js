@@ -1318,25 +1318,30 @@ export default function EssayComparison() {
   const [replaceModal, setReplaceModal] = useState({ open: false, side: "left" });
   const [replaceQuery, setReplaceQuery] = useState("");
   const [replaceActiveIdx, setReplaceActiveIdx] = useState(0);
+  const [metricsModalOpen, setMetricsModalOpen] = useState(false);
 
   const openReplace = (side) => {
     setReplaceQuery("");
     setReplaceActiveIdx(0);
     setReplaceModal({ open: true, side });
-    if (typeof document !== "undefined") document.body.style.overflow = "hidden";
   };
   const closeReplace = () => {
     setReplaceModal({ open: false, side: "left" });
     setReplaceQuery("");
     setReplaceActiveIdx(0);
-    if (typeof document !== "undefined") document.body.style.overflow = "";
   };
 
+  const openMetricsModal = () => setMetricsModalOpen(true);
+  const closeMetricsModal = () => setMetricsModalOpen(false);
+
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = replaceModal.open || metricsModalOpen ? "hidden" : "";
+
     return () => {
-      if (typeof document !== "undefined") document.body.style.overflow = "";
+      document.body.style.overflow = "";
     };
-  }, []);
+  }, [replaceModal.open, metricsModalOpen]);
 
   const currentIdForSide = replaceModal.side === "left" ? leftDocId : rightDocId;
   const otherIdForSide = replaceModal.side === "left" ? rightDocId : leftDocId;
@@ -1486,6 +1491,37 @@ export default function EssayComparison() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FloatingTooltip tooltip={tooltip} />
+
+      {/* Metrics Modal (small screens) */}
+      {metricsModalOpen && (
+        <div className="fixed inset-0 z-[9997] lg:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={closeMetricsModal} />
+          <div className="absolute inset-0 flex items-end justify-center p-3">
+            <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">Metrics & Presets</div>
+                  <div className="mt-1 text-xs text-gray-500">Choose metrics and manage presets for this comparison.</div>
+                </div>
+                <button onClick={closeMetricsModal} className="p-2 rounded-lg hover:bg-gray-50" aria-label="Close metrics panel">
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="p-3 max-h-[80vh] overflow-y-auto">
+                <MetricsPanel
+                  metrics={selectedMetrics}
+                  setMetrics={setSelectedMetrics}
+                  title="Metrics"
+                  useSticky={false}
+                  stickyTopClassName="top-0"
+                  className="col-span-12"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Replace Modal */}
       {replaceModal.open && (
@@ -1640,11 +1676,22 @@ export default function EssayComparison() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* ✅ Sidebar replaced with MetricsPanel */}
-            <div className="lg:col-span-3">
+            <div className="hidden lg:block lg:col-span-3">
               <MetricsPanel metrics={selectedMetrics} setMetrics={setSelectedMetrics} title="Metrics" stickyTopClassName="top-24" />
             </div>
 
             <section className="lg:col-span-9">
+              <div className="mb-4 lg:hidden">
+                <button
+                  onClick={openMetricsModal}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700"
+                  type="button"
+                >
+                  <ListCollapse className="h-4 w-4" />
+                  Metrics & Presets
+                </button>
+              </div>
+
               {showInlineWarning ? (
                 <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
                   Some data errors were reported while loading documents.
