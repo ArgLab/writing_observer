@@ -640,7 +640,7 @@ export default function WritingPortfolioDashboard() {
           <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
-                Welcome back, Ms. Rodriguez! <span className="inline-block">👋</span>
+                Welcome back! <span className="inline-block">👋</span>
               </h1>
               <p className="mt-2 text-gray-600">A snapshot of your class writing activity and progress.</p>
 

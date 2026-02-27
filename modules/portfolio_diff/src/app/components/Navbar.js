@@ -71,7 +71,7 @@ export default function Navbar() {
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600/20 ring-1 ring-emerald-500/40">
                 <User className="h-4 w-4 text-emerald-300" />
               </div>
-              <span className="pr-1 text-white">Sarah Rodriguez</span>
+              <span className="pr-1 text-white">Your Account</span>
               <ChevronDown
                 className={`h-4 w-4 text-zinc-400 group-hover:text-zinc-300 transition-transform ${
                   menuOpen ? "rotate-180" : ""
@@ -151,7 +151,7 @@ export default function Navbar() {
                   <User className="h-4 w-4 text-emerald-300" />
                 </div>
                 <div>
-                  <p className="text-sm text-white">Sarah Rodriguez</p>
+                  <p className="text-sm text-white">Your Account</p>
                   <p className="text-xs text-zinc-400">Mentor</p>
                 </div>
               </div>
