@@ -689,7 +689,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
   // When dataScope changes, send the new scope over the existing connection
   const prevScopeRef = useRef(null);
   useEffect(() => {
-    if (!connection || !exportEnabled) return;
+    if (!connection?.sendMessage || !exportEnabled) return;
 
     const scopeStr = stableStringify(dataScope);
     if (scopeStr === prevScopeRef.current) return;
@@ -701,7 +701,11 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
       console.groupEnd();
     }
 
-    connection.sendMessage(JSON.stringify(dataScope));
+    try {
+      connection.sendMessage(JSON.stringify(dataScope));
+    } catch (e) {
+      console.warn("[SingleEssayInnerModal] failed to send updated dataScope", e);
+    }
   }, [connection, dataScope, exportEnabled]);
 
   const docsObj = useMemo(() => loData?.students?.[studentKey]?.documents || {}, [loData, studentKey]);
