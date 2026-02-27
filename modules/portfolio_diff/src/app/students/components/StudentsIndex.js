@@ -161,6 +161,7 @@ export default function WritingPortfolioDashboard() {
         id: s?.user_id ?? `student-${idx + 1}`,
         firstname: nameObj?.given_name || `Student ${idx + 1}`,
         lastname: nameObj?.family_name || "",
+        fullname: nameObj?.full_name || `Student ${idx + 1}`,
         avatar: "",
         documents: docCount,
         lastAccessSec: lastAccessSec ?? null, // for sorting
@@ -472,8 +473,7 @@ export default function WritingPortfolioDashboard() {
 
               {[
                 { key: "id", label: "ID", align: "text-left" },
-                { key: "firstname", label: "First Name", align: "text-left" },
-                { key: "lastname", label: "Last Name", align: "text-left" },
+                { key: "fullname", label: "Name", align: "text-left" },
                 { key: "documents", label: "Documents", align: "text-center" },
                 { key: "lastActivity", label: "Last Activity", align: "text-left" },
                 { key: "risk", label: "Risk Level", align: "text-left" },
@@ -532,16 +532,14 @@ export default function WritingPortfolioDashboard() {
                 </td>
 
                 <td className="px-6 py-4">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-semibold text-emerald-700 mr-3">
-                      {student.avatar}
+                  <Link href={`students?student_id=${student.id}`}>
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-semibold text-emerald-700 mr-3">
+                        {student.avatar}
+                      </div>
+                      <div className="text-sm font-medium text-gray-900">{student.fullname}</div>
                     </div>
-                    <div className="text-sm font-medium text-gray-900">{student.firstname}</div>
-                  </div>
-                </td>
-
-                <td className="px-6 py-4">
-                  <span className="text-sm text-gray-900">{student.lastname}</span>
+                  </Link>
                 </td>
 
                 <td className="px-6 py-4 text-center">
