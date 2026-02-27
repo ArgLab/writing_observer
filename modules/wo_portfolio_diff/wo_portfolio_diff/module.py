@@ -5,7 +5,7 @@ A writing observer module that shows the difference between the works of a stude
 '''
 
 # Name for the module
-NAME = 'Writing Observer Portfolio Diff'
+NAME = 'Writing Observer - Portfolio Diff'
 
 
 '''
