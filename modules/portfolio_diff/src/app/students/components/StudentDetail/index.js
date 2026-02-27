@@ -18,7 +18,7 @@ import { getWsOriginFromWindow } from "@/app/utils/ws";
 const MODES = { COMPARE: "compare", GROWTH: "growth" };
 
 const STUDENTS_BREADCRUMB_HREF =
-  "http://localhost:8888/wo_portfolio_diff/portfolio_diff/students";
+  "/wo_portfolio_diff/portfolio_diff/students";
 
 const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const monthsLong = [
