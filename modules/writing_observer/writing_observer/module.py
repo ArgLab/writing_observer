@@ -99,6 +99,8 @@ EXECUTION_DAG = {
         'update_docs': update_via_google(runtime=q.parameter("runtime"), doc_ids=q.variable('doc_sources')),
         "docs": q.select(q.keys('writing_observer.reconstruct', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("update_docs"), RESOURCES_path='doc_id'), fields={'text': 'text'}),
         "docs_combined": q.join(LEFT=q.variable("docs"), RIGHT=q.variable("roster"), LEFT_ON='provenance.provenance.STUDENT.value.user_id', RIGHT_ON='user_id'),
+        "paste_metrics": q.select(q.keys('writing_observer.lo_paste_reducer', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("doc_sources"), RESOURCES_path='doc_id'), fields='All'),
+        "copy_cut_metrics": q.select(q.keys('writing_observer.lo_copy_cut_reducer', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("doc_sources"), RESOURCES_path='doc_id'), fields='All'),
         'nlp': process_texts(writing_data=q.variable('docs'), options=q.parameter('nlp_options', required=False, default=[])),
         'nlp_sep_proc': q.select(q.keys('writing_observer.nlp_components', STUDENTS=q.variable('roster'), STUDENTS_path='user_id', RESOURCES=q.variable("doc_ids"), RESOURCES_path='doc_id'), fields='All'),
         'nlp_combined': q.join(LEFT=q.variable(nlp_source), LEFT_ON='provenance.provenance.STUDENT.value.user_id', RIGHT=q.variable('roster'), RIGHT_ON='user_id'),
@@ -165,6 +167,16 @@ EXECUTION_DAG = {
     "exports": {
         "docs_with_roster": {
             "returns": "docs_combined",
+            "parameters": ["course_id"],
+            "output": ""
+        },
+        "paste_metrics": {
+            "returns": "paste_metrics",
+            "parameters": ["course_id"],
+            "output": ""
+        },
+        "copy_cut_metrics": {
+            "returns": "copy_cut_metrics",
             "parameters": ["course_id"],
             "output": ""
         },
@@ -264,6 +276,36 @@ STUDENT_AGGREGATORS = {
 
 # Incoming event APIs
 REDUCERS = [
+    {
+        'context': "org.mitros.writing_analytics",
+        'scope': writing_observer.writing_analysis.gdoc_scope,
+        'function': writing_observer.writing_analysis.lo_paste_reducer,
+        'default': {
+            'paste_count': 0,
+            'pastes_with_length': 0,
+            'total_paste_chars': 0,
+            'max_paste_len': 0,
+            'last_paste_len': 0,
+            'big_pastes': 0,
+            'length_bins': {'short_1_20': 0, 'medium_21_200': 0, 'long_201_plus': 0},
+            'recent_pastes': [],
+            'awaiting_paste_until': 0,
+            'maybe_menu_paste_until': 0,
+            'last_paste_signal_ms': 0
+        }
+    },
+    {
+        'context': "org.mitros.writing_analytics",
+        'scope': writing_observer.writing_analysis.gdoc_scope,
+        'function': writing_observer.writing_analysis.lo_copy_cut_reducer,
+        'default': {
+            'copy_count': 0,
+            'cut_count': 0,
+            'last_copy_ts': 0,
+            'last_cut_ts': 0,
+            'recent_events': []
+        }
+    },
     {
         'context': "org.mitros.writing_analytics",
         'scope': writing_observer.writing_analysis.gdoc_scope,
