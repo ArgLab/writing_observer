@@ -21,6 +21,7 @@ import writing_observer.writing_analysis
 import writing_observer.languagetool
 import writing_observer.tag_docs
 import writing_observer.document_timestamps
+import writing_observer.copy_paste_utils
 from writing_observer.nlp_indicators import INDICATOR_JSONS
 
 
@@ -280,31 +281,13 @@ REDUCERS = [
         'context': "org.mitros.writing_analytics",
         'scope': writing_observer.writing_analysis.gdoc_scope,
         'function': writing_observer.writing_analysis.lo_paste_reducer,
-        'default': {
-            'paste_count': 0,
-            'pastes_with_length': 0,
-            'total_paste_chars': 0,
-            'max_paste_len': 0,
-            'last_paste_len': 0,
-            'big_pastes': 0,
-            'length_bins': {'short_1_20': 0, 'medium_21_200': 0, 'long_201_plus': 0},
-            'recent_pastes': [],
-            'awaiting_paste_until': 0,
-            'maybe_menu_paste_until': 0,
-            'last_paste_signal_ms': 0
-        }
+        'default': writing_observer.copy_paste_utils.default_paste_state()
     },
     {
         'context': "org.mitros.writing_analytics",
         'scope': writing_observer.writing_analysis.gdoc_scope,
         'function': writing_observer.writing_analysis.lo_copy_cut_reducer,
-        'default': {
-            'copy_count': 0,
-            'cut_count': 0,
-            'last_copy_ts': 0,
-            'last_cut_ts': 0,
-            'recent_events': []
-        }
+        'default': writing_observer.copy_paste_utils.default_copy_cut_state()
     },
     {
         'context': "org.mitros.writing_analytics",
