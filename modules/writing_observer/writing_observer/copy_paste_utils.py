@@ -13,6 +13,7 @@ PASTE_WAIT_MS = 2500
 MENU_FLAG_MS = 1500
 DEDUP_MS = 750
 BIG_PASTE_THRESHOLD = 200
+MAX_RECENT_PASTE_TEXT_CHARS = 500
 
 DOC_URL_RE = re.compile(r"^https://docs.google.com/document/d/(?P<DOCID>[^/\s]+)/(?P<ACT>[a-zA-Z]+)")
 
@@ -156,6 +157,14 @@ def append_recent(items, entry, limit=10):
     return items
 
 
+def clip_recent_paste_text(text, limit=MAX_RECENT_PASTE_TEXT_CHARS):
+    if text is None:
+        return None, False
+    if len(text) <= limit:
+        return text, False
+    return text[:limit], True
+
+
 def default_paste_state():
     return {
         "paste_count": 0,
@@ -199,7 +208,13 @@ def update_paste_state(event, state):
         state["awaiting_paste_until"] = ts_ms + PASTE_WAIT_MS
         state["recent_pastes"] = append_recent(
             state.get("recent_pastes"),
-            {"timestamp_ms": ts_ms, "length": None, "source": "keyboard_signal"},
+            {
+                "timestamp_ms": ts_ms,
+                "length": None,
+                "source": "keyboard_signal",
+                "text": None,
+                "text_truncated": False,
+            }
         )
         return state
 
@@ -241,12 +256,15 @@ def update_paste_state(event, state):
         state.setdefault("length_bins", {})
         state["length_bins"][bin_name] = state["length_bins"].get(bin_name, 0) + 1
 
+    clipped_text, was_truncated = clip_recent_paste_text(inserted_text)
     state["recent_pastes"] = append_recent(
         state.get("recent_pastes"),
         {
             "timestamp_ms": ts_ms,
             "length": paste_length,
             "source": "menu_inferred" if counted_from_save else "google_docs_save",
+            "text": clipped_text,
+            "text_truncated": was_truncated,
         },
     )
     state["awaiting_paste_until"] = 0
