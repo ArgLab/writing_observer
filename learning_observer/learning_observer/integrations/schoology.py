@@ -136,32 +136,3 @@ async def clean_course_roster(schoology_json):
         key=lambda user: user.get('profile', {}).get('name', {}).get('family_name', '')
     )
     return users
-
-
-# ---------------------------------------------------------------------------
-# Assignments (AGS line items)
-# ---------------------------------------------------------------------------
-@register_cleaner('course_assignments', 'assignments')
-def clean_course_assignments(schoology_json):
-    '''
-    TODO implemement this function
-    When launching via LTI, Schoology only allows us to see assignments
-    created by our tool. To see all assignments we require an Oauth workflow.
-    Clean course line items (assignments) from Schoology via LTI AGS.
-    '''
-    raise NotImplemented('Schoology assignments have not yet been implemented.')
-
-
-# ---------------------------------------------------------------------------
-# Assignment results / assigned docs (AGS results)
-# ---------------------------------------------------------------------------
-@register_cleaner('assignment_results', 'assigned_docs')
-async def clean_assigned_docs(schoology_json):
-    '''
-    TODO implemement this function
-    When launching via LTI, Schoology only allows us to see assignments
-    created by our tool. To see all assignments we require an Oauth workflow.
-    Extract per-student Google Doc attachments from LTI AGS results
-    for a single assignment.
-    '''
-    raise NotImplemented('Schoology documents from assignments have not yet been implemented.')
