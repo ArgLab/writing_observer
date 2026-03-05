@@ -113,7 +113,14 @@ function createProcessTags (document, metrics) {
         const color = document[metric.id] === 'active' ? 'success' : 'warning';
         return createDashComponent(
           DASH_BOOTSTRAP_COMPONENTS, 'Badge',
-          { children: document[metric.id], color }
+          { children: document[metric.id], color, className: 'me-1' }
+        );
+      case 'paste':
+        const pasteCount = document?.pastes_with_length ?? 0;
+        const pasteColor = pasteCount > 0 ? 'warning' : 'secondary'
+        return createDashComponent(
+          DASH_BOOTSTRAP_COMPONENTS, 'Badge',
+          { children: `${pasteCount} pastes`, color: pasteColor }
         );
       default:
         break;
@@ -140,7 +147,7 @@ function studentHasResponded (student, appliedHash) {
   return true;
 }
 
-const ClassroomTextHighlightLoadingQueries = ['docs_with_nlp_annotations', 'time_on_task', 'activity'];
+const ClassroomTextHighlightLoadingQueries = ['docs_with_nlp_annotations', 'time_on_task', 'activity', 'paste_metrics'];
 
 // ── Walkthrough step definitions ──────────────────────────────────────
 const WALKTHROUGH_STEPS = [
@@ -369,7 +376,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       const outgoingMessage = {
         wo_classroom_text_highlighter_query: {
           execution_dag: 'writing_observer',
-          target_exports: ['docs_with_nlp_annotations', 'document_sources', 'document_list', 'time_on_task', 'activity'],
+          target_exports: ['docs_with_nlp_annotations', 'document_sources', 'document_list', 'time_on_task', 'activity', 'paste_metrics'],
           kwargs: decodedParams
         }
       };

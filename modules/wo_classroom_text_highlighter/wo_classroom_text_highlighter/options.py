@@ -4,7 +4,8 @@ import writing_observer.languagetool_features
 PROCESS_OPTIONS = [
     {'id': 'process_information', 'label': 'Process Information', 'parent': ''},
     {'id': 'time_on_task', 'label': 'Time on Task', 'types': ['metric'], 'parent': 'process_information'},
-    {'id': 'status', 'label': 'Status', 'types': ['metric'], 'parent': 'process_information'}
+    {'id': 'status', 'label': 'Status', 'types': ['metric'], 'parent': 'process_information'},
+    {'id': 'paste', 'label': 'Paste', 'types': ['metric'], 'parent': 'process_information'}
 ]
 OPTIONS = PROCESS_OPTIONS + [
     {'id': indicator['id'], 'types': ['highlight'], 'label': indicator['name'], 'parent': indicator['category']}
@@ -16,7 +17,8 @@ OPTIONS.append({'id': 'text_information', 'label': 'Text Information', 'parent':
 
 DEFAULT_VALUE = {
     'time_on_task': {'metric': {'value': True}},
-    'status': {'metric': {'value': True}}
+    'status': {'metric': {'value': True}},
+    'paste': {'metric': {'value': True}}
 }
 
 # Set of colors to use for highlighting with presets

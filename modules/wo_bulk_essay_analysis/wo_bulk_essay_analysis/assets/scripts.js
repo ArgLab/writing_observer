@@ -32,6 +32,13 @@ function createProcessTags (document, metrics) {
           DASH_BOOTSTRAP_COMPONENTS, 'Badge',
           { children: document[metric.id], color }
         );
+      case 'paste':
+        const pasteCount = document?.pastes_with_length ?? 0;
+        const pasteColor = pasteCount > 0 ? 'warning' : 'secondary'
+        return createDashComponent(
+          DASH_BOOTSTRAP_COMPONENTS, 'Badge',
+          { children: `${pasteCount} pastes`, color: pasteColor }
+        );
       default:
         break;
     }
@@ -214,7 +221,7 @@ const fileTextExtractors = {
   docx: extractDOCX
 };
 
-const AIAssistantLoadingQueries = ['gpt_bulk', 'time_on_task', 'activity'];
+const AIAssistantLoadingQueries = ['gpt_bulk', 'time_on_task', 'activity', 'paste_metrics'];
 
 // ── Walkthrough step definitions ──────────────────────────────────────
 const BULK_WALKTHROUGH_STEPS = [
@@ -633,7 +640,7 @@ window.dash_clientside.bulk_essay_feedback = {
       const message = {
         wo: {
           execution_dag: 'writing_observer',
-          target_exports: ['gpt_bulk', 'document_list', 'document_sources', 'time_on_task', 'activity'],
+          target_exports: ['gpt_bulk', 'document_list', 'document_sources', 'time_on_task', 'activity', 'paste_metrics'],
           kwargs: decoded
         }
       };
