@@ -24,6 +24,7 @@ import writing_observer.writing_analysis
 import writing_observer.languagetool
 import writing_observer.tag_docs
 import writing_observer.document_timestamps
+import writing_observer.copy_paste_utils
 from writing_observer.nlp_indicators import INDICATOR_JSONS
 
 
@@ -163,6 +164,8 @@ EXECUTION_DAG = {
         'update_docs': update_via_google(runtime=q.parameter("runtime"), doc_ids=q.variable('doc_sources')),
 
         "docs_combined": q.join(LEFT=q.variable("docs"), RIGHT=q.variable("roster"), LEFT_ON='provenance.provenance.STUDENT.value.user_id', RIGHT_ON='user_id'),
+        "paste_metrics": q.select(q.keys('writing_observer.lo_paste_reducer', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("doc_sources"), RESOURCES_path='doc_id'), fields={'pastes_with_length': 'pastes_with_length', 'length_bins': 'length_bins', 'total_paste_chars': 'total_paste_chars'}),
+        "copy_cut_metrics": q.select(q.keys('writing_observer.lo_copy_cut_reducer', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("doc_sources"), RESOURCES_path='doc_id'), fields={'copy_count': 'copy_count'}),
         'nlp': process_texts(writing_data=q.variable('docs'), options=q.parameter('nlp_options', required=False, default=[])),
         'nlp_sep_proc': q.select(q.keys('writing_observer.nlp_components', STUDENTS=q.variable('roster'), STUDENTS_path='user_id', RESOURCES=q.variable("doc_ids"), RESOURCES_path='doc_id'), fields='All'),
         'nlp_combined': q.join(LEFT=q.variable(nlp_source), LEFT_ON='provenance.provenance.STUDENT.value.user_id', RIGHT=q.variable('roster'), RIGHT_ON='user_id'),
@@ -229,6 +232,16 @@ EXECUTION_DAG = {
     "exports": {
         "docs_with_roster": {
             "returns": "docs_combined",
+            "parameters": ["course_id"],
+            "output": ""
+        },
+        "paste_metrics": {
+            "returns": "paste_metrics",
+            "parameters": ["course_id"],
+            "output": ""
+        },
+        "copy_cut_metrics": {
+            "returns": "copy_cut_metrics",
             "parameters": ["course_id"],
             "output": ""
         },
@@ -353,6 +366,18 @@ STUDENT_AGGREGATORS = {
 
 # Incoming event APIs
 REDUCERS = [
+    {
+        'context': "org.mitros.writing_analytics",
+        'scope': writing_observer.writing_analysis.gdoc_scope,
+        'function': writing_observer.writing_analysis.lo_paste_reducer,
+        'default': writing_observer.copy_paste_utils.default_paste_state()
+    },
+    {
+        'context': "org.mitros.writing_analytics",
+        'scope': writing_observer.writing_analysis.gdoc_scope,
+        'function': writing_observer.writing_analysis.lo_copy_cut_reducer,
+        'default': writing_observer.copy_paste_utils.default_copy_cut_state()
+    },
     {
         'context': "org.mitros.writing_analytics",
         'scope': writing_observer.writing_analysis.gdoc_scope,

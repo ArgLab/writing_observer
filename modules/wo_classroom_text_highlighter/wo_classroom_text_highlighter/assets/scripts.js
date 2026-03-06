@@ -113,12 +113,25 @@ function createProcessTags (document, metrics) {
         const color = document[metric.id] === 'active' ? 'success' : 'warning';
         return createDashComponent(
           DASH_BOOTSTRAP_COMPONENTS, 'Badge',
-          { children: document[metric.id], color }
+          { children: document[metric.id], color, className: 'me-1' }
+        );
+      case 'paste_events':
+      case 'paste_bins':
+      case 'total_paste_chars':
+      case 'paste':
+        if (!window.WOPasteMetricHelpers?.createPasteMetricComponent) { return null; }
+        return window.WOPasteMetricHelpers.createPasteMetricComponent(document, metric.id);
+      case 'copy':
+        const copyCount = document?.copy_count ?? 0;
+        const copyColor = copyCount > 0 ? 'primary' : 'secondary'
+        return createDashComponent(
+          DASH_BOOTSTRAP_COMPONENTS, 'Badge',
+          { children: `${copyCount} copies`, color: copyColor }
         );
       default:
         break;
     }
-  });
+  }).filter(Boolean);
   return createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children, className: 'sticky-top' });
 }
 
@@ -140,7 +153,7 @@ function studentHasResponded (student, appliedHash) {
   return true;
 }
 
-const ClassroomTextHighlightLoadingQueries = ['docs_with_nlp_annotations', 'time_on_task', 'activity'];
+const ClassroomTextHighlightLoadingQueries = ['docs_with_nlp_annotations', 'time_on_task', 'activity', 'paste_metrics', 'copy_cut_metrics'];
 
 // ── Walkthrough step definitions ──────────────────────────────────────
 const WALKTHROUGH_STEPS = [
@@ -369,7 +382,7 @@ window.dash_clientside.wo_classroom_text_highlighter = {
       const outgoingMessage = {
         wo_classroom_text_highlighter_query: {
           execution_dag: 'writing_observer',
-          target_exports: ['docs_with_nlp_annotations', 'document_sources', 'document_list', 'time_on_task', 'activity'],
+          target_exports: ['docs_with_nlp_annotations', 'document_sources', 'document_list', 'time_on_task', 'activity', 'paste_metrics', 'copy_cut_metrics'],
           kwargs: decodedParams
         }
       };
