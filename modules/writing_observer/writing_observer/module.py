@@ -11,8 +11,11 @@ This may be an examplar for building new modules too.
 # files.
 import pmss
 
+import learning_observer.communication_protocol.integration
 import learning_observer.communication_protocol.query as q
+import learning_observer.constants as constants
 import learning_observer.settings
+import learning_observer.rosters
 
 from learning_observer import downloads as d
 
@@ -26,6 +29,16 @@ from writing_observer.nlp_indicators import INDICATOR_JSONS
 
 
 NAME = "The Writing Observer"
+
+@learning_observer.communication_protocol.integration.publish_function('writing_observer.roster_with_provenance')
+async def roster_with_provenance(roster, course_id):
+    """Fetch roster entries and add STUDENT provenance for protocol consumers."""
+    for student in roster:
+        if constants.USER_ID not in student:
+            continue
+        student['provenance'] = {'STUDENT': {constants.USER_ID: student[constants.USER_ID]}}
+    return roster
+
 
 # things that process data versus things that interact with the environment
 # side-effects or not
@@ -44,6 +57,7 @@ document_access_ts = q.call('writing_observer.fetch_doc_at_timestamp')
 document_by_title_text = q.call('writing_observer.fetch_doc_by_title_text')
 
 source_selector = q.call('source_selector')
+single_student_from_roster = q.call('writing_observer.single_student_from_roster')
 
 # TODO each of these choices should come from an Enum
 pmss.parser('nlp_source', parent='string', choices=['nlp', 'nlp_sep_proc'], transform=None)
@@ -96,9 +110,59 @@ document_sources = source_selector(
 EXECUTION_DAG = {
     "execution_dag": {
         "roster": course_roster(runtime=q.parameter("runtime"), course_id=q.parameter("course_id", required=True)),
+        "roster_with_provenance": q.call('writing_observer.roster_with_provenance')(roster=q.variable('roster'), course_id=q.parameter("course_id", required=True)),
+        # all documents for a student
+        'student_with_docs': q.select(
+            q.keys(
+                'writing_observer.document_list',
+                scope_fields={
+                    "student": q.parameter("student_id", required=True)
+                }
+            ),
+            fields={'docs': 'documents'}
+        ),
+        # a single document by explicit doc id
+        'single_student_doc_by_id': q.select(
+            q.keys(
+                'writing_observer.reconstruct',
+                scope_fields={
+                    "student": q.parameter("student_id", required=True),
+                    "doc_id": q.parameter("doc_ids", default=[])
+                }
+            ),
+            fields={'text': 'text'}
+        ),
+        'single_student_profile': single_student_from_roster(
+            roster=q.variable('roster_with_provenance'),
+            student_id=q.parameter('student_id', required=True)
+        ),
+        "docs": q.select(
+            q.keys(
+                'writing_observer.reconstruct',
+                scope_fields={
+                    "student": {"values": q.variable("roster"), "path": "user_id"},
+                    "doc_id": {"values": q.variable("update_docs"), "path": "doc_id"}
+                }
+            ), 
+            fields={'text': 'text'}
+        ),
+        'single_student_docs_by_ids': q.select(
+            q.keys(
+                'writing_observer.reconstruct',
+                scope_fields={
+                    "student": q.parameter("student_id", required=True),
+                    "doc_id": q.parameter("document", default=[])
+                }
+            ),
+            fields={'text': 'text'}
+        ),
+        'single_student_nlp': process_texts(
+            writing_data=q.variable('single_student_docs_by_ids'),
+            options=q.parameter('nlp_options', required=False, default=[])
+        ),
         "doc_ids": q.select(q.keys('writing_observer.last_document', STUDENTS=q.variable("roster"), STUDENTS_path='user_id'), fields={'document_id': 'doc_id'}),
         'update_docs': update_via_google(runtime=q.parameter("runtime"), doc_ids=q.variable('doc_sources')),
-        "docs": q.select(q.keys('writing_observer.reconstruct', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("update_docs"), RESOURCES_path='doc_id'), fields={'text': 'text'}),
+
         "docs_combined": q.join(LEFT=q.variable("docs"), RIGHT=q.variable("roster"), LEFT_ON='provenance.provenance.STUDENT.value.user_id', RIGHT_ON='user_id'),
         "paste_metrics": q.select(q.keys('writing_observer.lo_paste_reducer', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("doc_sources"), RESOURCES_path='doc_id'), fields={'pastes_with_length': 'pastes_with_length', 'length_bins': 'length_bins', 'total_paste_chars': 'total_paste_chars'}),
         "copy_cut_metrics": q.select(q.keys('writing_observer.lo_copy_cut_reducer', STUDENTS=q.variable("roster"), STUDENTS_path='user_id', RESOURCES=q.variable("doc_sources"), RESOURCES_path='doc_id'), fields={'copy_count': 'copy_count'}),
@@ -182,8 +246,33 @@ EXECUTION_DAG = {
             "output": ""
         },
         "roster": {
-            "returns": "roster",
+            "returns": "roster_with_provenance",
             "parameters": ["course_id"],
+            "output": ""
+        },
+        "student_with_docs": {
+            "returns": "student_with_docs",
+            # "parameters": ["student_id"],
+            "output": ""
+        },
+        "single_student_doc_by_id": {
+            "returns": "single_student_doc_by_id",
+            "parameters": ["student_id", "doc_ids"],
+            "output": ""
+        },
+        "single_student_profile": {
+            "returns": "single_student_profile",
+            "parameters": ["student_id"],
+            "output": ""
+        },
+        "single_student_all_reconstruct": {
+            "returns": "single_student_all_reconstruct",
+            "parameters": ["student_id"],
+            "output": ""
+        },
+        "single_student_docs_with_nlp_annotations": {
+            "returns": "single_student_nlp",
+            "parameters": ["student_id", "document", "nlp_options"],
             "output": ""
         },
         "document_list": {
