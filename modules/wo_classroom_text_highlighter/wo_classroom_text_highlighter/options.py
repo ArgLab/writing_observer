@@ -5,7 +5,10 @@ PROCESS_OPTIONS = [
     {'id': 'process_information', 'label': 'Process Information', 'parent': ''},
     {'id': 'time_on_task', 'label': 'Time on Task', 'types': ['metric'], 'parent': 'process_information'},
     {'id': 'status', 'label': 'Status', 'types': ['metric'], 'parent': 'process_information'},
-    {'id': 'paste', 'label': 'Paste', 'types': ['metric'], 'parent': 'process_information'}
+    {'id': 'paste_events', 'label': '# Paste Events', 'types': ['metric'], 'parent': 'process_information'},
+    {'id': 'paste_bins', 'label': 'Binned Paste Events', 'types': ['metric'], 'parent': 'process_information'},
+    {'id': 'total_paste_chars', 'label': 'Total Characters Pasted', 'types': ['metric'], 'parent': 'process_information'},
+    {'id': 'copy', 'label': 'Copy', 'types': ['metric'], 'parent': 'process_information'}
 ]
 OPTIONS = PROCESS_OPTIONS + [
     {'id': indicator['id'], 'types': ['highlight'], 'label': indicator['name'], 'parent': indicator['category']}
@@ -18,7 +21,10 @@ OPTIONS.append({'id': 'text_information', 'label': 'Text Information', 'parent':
 DEFAULT_VALUE = {
     'time_on_task': {'metric': {'value': True}},
     'status': {'metric': {'value': True}},
-    'paste': {'metric': {'value': True}}
+    'paste_events': {'metric': {'value': True}},
+    'paste_bins': {'metric': {'value': True}},
+    'total_paste_chars': {'metric': {'value': True}},
+    'copy': {'metric': {'value': True}}
 }
 
 # Set of colors to use for highlighting with presets
