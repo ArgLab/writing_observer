@@ -79,16 +79,12 @@ Two backends are provided:
 - **FSStorage** -- one file per stream (JSONL format); stream names are
   mapped to filenames via SHA-256 to avoid path-traversal issues.
 
-Both are thread-safe (coarse ``threading.Lock``).  The ``StreamStorage``
-base class defines the interface so that Kafka, S3, or database backends
+Both expose an async interface.  :class:`InMemoryStorage` methods are
+trivially async (no real I/O), while :class:`FSStorage` offloads blocking
+file operations to the default executor via
+:meth:`asyncio.loop.run_in_executor`.  The :class:`StreamStorage` base
+class defines the async interface so that Kafka, S3, or database backends
 can be added without changing the Merkle logic.
-
-Async Integration
------------------
-``AsyncMerkle`` wraps ``Merkle`` and delegates every call to
-``loop.run_in_executor`` so that blocking storage I/O does not stall an
-``asyncio`` event loop.  See the "Pipeline Integration" section in the
-companion documentation for a real-world usage example.
 
 Visualization
 -------------
@@ -126,7 +122,6 @@ Prototype Caveats
 This is a working prototype.  Production hardening would include:
 
 - Kafka or equivalent backend for durable, distributed streaming.
-- Full ``asyncio``-native storage (not executor-wrapped blocking I/O).
 - Batched / periodic Merkle root publication.
 - Proper stream-name escaping or deterministic session-ID generation.
 - Chunk boundaries (hourly, daily, size-based) within long-lived streams.
@@ -134,6 +129,7 @@ This is a working prototype.  Production hardening would include:
 - Comprehensive property-based and integration tests.
 '''
 
+import asyncio
 import hashlib
 import json
 import datetime
@@ -141,6 +137,7 @@ import os
 import threading
 from typing import Any, Dict, List, Optional, Set, Iterator, Tuple, Union
 from dataclasses import dataclass, field
+from concurrent.futures import Executor
 
 try:
     import pydot
@@ -528,15 +525,18 @@ def _style_for_classification(classification: str) -> dict:
 # ---------------------------------------------------------------------------
 
 class Merkle:
-    '''Core Merkle DAG engine.
+    '''Core async Merkle DAG engine.
 
     Manages append-only event streams, session lifecycle, chain
-    verification, and tombstone deletion.
+    verification, and tombstone deletion.  All public methods are
+    coroutines so they integrate naturally with an ``asyncio`` event
+    loop.
 
     Parameters
     ----------
     storage : StreamStorage
-        The backend that persists streams.
+        The backend that persists streams.  All storage methods are
+        async.
     categories : set of str
         The set of category keys (e.g. ``{"student", "teacher"}``) that
         trigger parent-stream propagation when a session is closed.
@@ -548,10 +548,9 @@ class Merkle:
 
     Notes
     -----
-    This class is **not** thread-safe by itself; thread safety is
-    delegated to the storage backend.  If two threads concurrently
-    append to the *same* session, the chain linkage may be inconsistent.
-    In production, each session should be owned by a single writer.
+    Each session should be owned by a single writer.  If two
+    coroutines concurrently append to the *same* session, the chain
+    linkage may be inconsistent.
     '''
 
     def __init__(self, storage: 'StreamStorage', categories: Set[str]):
@@ -560,7 +559,7 @@ class Merkle:
 
     # ---- core append ---------------------------------------------------
 
-    def event_to_session(
+    async def event_to_session(
         self,
         event: dict,
         session: dict,
@@ -619,7 +618,7 @@ class Merkle:
         children.append(event_hash)
 
         # 2. Link to the previous item in this stream (if any)
-        last_item = storage._most_recent_item(sid)
+        last_item = await storage.most_recent_item(sid)
         if last_item is not None:
             children.append(last_item['hash'])
 
@@ -635,12 +634,12 @@ class Merkle:
         if label is not None:
             item['label'] = label
 
-        storage._append_to_stream(sid, item)
+        await storage.append_to_stream(sid, item)
         return item
 
     # ---- session lifecycle ---------------------------------------------
 
-    def start(
+    async def start(
         self,
         session: dict,
         metadata: Optional[dict] = None,
@@ -678,10 +677,10 @@ class Merkle:
             event['continues'] = continuation_hash
 
         extra_children = [continuation_hash] if continuation_hash else []
-        return self.event_to_session(event, session,
-                                     children=extra_children, label='start')
+        return await self.event_to_session(event, session,
+                                           children=extra_children, label='start')
 
-    def close_session(
+    async def close_session(
         self,
         session: dict,
         logical_break: bool = False,
@@ -715,13 +714,13 @@ class Merkle:
             The final hash of the closed session stream.  This is the
             stream's new key in storage.
         '''
-        final_item = self.event_to_session(
+        final_item = await self.event_to_session(
             {'type': 'close', 'session': session},
             session,
             label='close',
         )
         session_hash = final_item['hash']
-        self.storage._rename_or_alias_stream(session_key(session), session_hash)
+        await self.storage.rename_or_alias_stream(session_key(session), session_hash)
 
         if logical_break:
             return session_hash
@@ -735,7 +734,7 @@ class Merkle:
                 values = [values]
             for value in values:
                 parent_session = {key: value}
-                self.event_to_session(
+                await self.event_to_session(
                     {
                         'type': 'child_session_finished',
                         'child_hash': session_hash,
@@ -747,7 +746,7 @@ class Merkle:
                 )
         return session_hash
 
-    def break_session(self, session: dict) -> str:
+    async def break_session(self, session: dict) -> str:
         '''Insert a logical break in *session*.
 
         Closes the current segment (renaming it to its final hash) and
@@ -769,13 +768,13 @@ class Merkle:
         str
             The hash of the closed segment.
         '''
-        segment_hash = self.close_session(session, logical_break=True)
-        self.start(session, continuation_hash=segment_hash)
+        segment_hash = await self.close_session(session, logical_break=True)
+        await self.start(session, continuation_hash=segment_hash)
         return segment_hash
 
     # ---- verification --------------------------------------------------
 
-    def verify_chain(self, stream_key: str) -> bool:
+    async def verify_chain(self, stream_key: str) -> bool:
         '''Verify the integrity of every item in a stream.
 
         Walks the stream front-to-back and checks three invariants for
@@ -807,7 +806,7 @@ class Merkle:
             If the stream is not found, is empty, or any item fails
             verification.
         '''
-        data = self.storage._get_stream_data(stream_key)
+        data = await self.storage.get_stream_data(stream_key)
         if not data:
             raise ValueError(f'Stream {stream_key!r} not found or empty')
 
@@ -832,7 +831,7 @@ class Merkle:
 
     # ---- deletion with tombstone ---------------------------------------
 
-    def delete_stream_with_tombstone(self, stream_key: str, reason: str) -> dict:
+    async def delete_stream_with_tombstone(self, stream_key: str, reason: str) -> dict:
         '''Delete a stream's data and leave a cryptographic tombstone.
 
         The tombstone preserves the stream's structural metadata --
@@ -866,7 +865,7 @@ class Merkle:
         ValueError
             If the stream does not exist or is already empty.
         '''
-        data = self.storage._get_stream_data(stream_key)
+        data = await self.storage.get_stream_data(stream_key)
         if not data:
             raise ValueError(f'Stream {stream_key!r} not found or empty')
 
@@ -884,8 +883,8 @@ class Merkle:
         }
         tombstone['tombstone_hash'] = merkle_hash(json_dump(tombstone))
 
-        self.storage._delete_stream(stream_key)
-        self.storage._append_to_stream(
+        await self.storage.delete_stream(stream_key)
+        await self.storage.append_to_stream(
             f'__tombstone__{stream_key}', tombstone
         )
         return tombstone
@@ -896,67 +895,67 @@ class Merkle:
 # ---------------------------------------------------------------------------
 
 class StreamStorage:
-    '''Abstract base class for stream storage backends.
+    '''Abstract base class for async stream storage backends.
 
     A **stream** is an ordered list of JSON-serializable dicts
     (items) identified by a string key.  Backends must implement the
-    following operations:
+    following async operations:
 
-    - ``_append_to_stream(stream, item)`` -- append one item.
-    - ``_rename_or_alias_stream(stream, alias)`` -- rename the stream
+    - ``append_to_stream(stream, item)`` -- append one item.
+    - ``rename_or_alias_stream(stream, alias)`` -- rename the stream
       key (used when a session is closed and the stream is
       content-addressed).
-    - ``_get_stream_data(stream)`` -- return the full list of items,
+    - ``get_stream_data(stream)`` -- return the full list of items,
       or ``None`` if the stream does not exist.
-    - ``_delete_stream(stream)`` -- remove the stream entirely.
-    - ``_most_recent_item(stream)`` -- return the last appended item,
+    - ``delete_stream(stream)`` -- remove the stream entirely.
+    - ``most_recent_item(stream)`` -- return the last appended item,
       or ``None``.
-    - ``_walk()`` -- iterate over every item in every stream (used for
-      visualization and bulk export).
-    - ``_walk_streams()`` -- iterate over ``(stream_key, items_list)``
+    - ``walk()`` -- async-iterate over every item in every stream (used
+      for visualization and bulk export).
+    - ``walk_streams()`` -- async-iterate over ``(stream_key, items_list)``
       pairs (used for stream-aware visualization).
 
-    All mutating operations must be **thread-safe**.  The simplest
-    approach is a per-backend coarse lock (as used by
-    :class:`InMemoryStorage` and :class:`FSStorage`).
+    All mutating operations must be **safe for concurrent awaits**.
     '''
 
-    def _append_to_stream(self, stream: str, item: dict):
+    async def append_to_stream(self, stream: str, item: dict):
         '''Append *item* to the end of *stream*, creating it if needed.'''
         raise NotImplementedError
 
-    def _rename_or_alias_stream(self, stream: str, alias: str):
+    async def rename_or_alias_stream(self, stream: str, alias: str):
         '''Rename *stream* to *alias*.  If they are equal, no-op.'''
         raise NotImplementedError
 
-    def _get_stream_data(self, stream: str) -> Optional[List[dict]]:
+    async def get_stream_data(self, stream: str) -> Optional[List[dict]]:
         '''Return all items in *stream*, or ``None`` if it does not exist.
 
         An existing but empty stream should return ``[]``.
         '''
         raise NotImplementedError
 
-    def _delete_stream(self, stream: str):
+    async def delete_stream(self, stream: str):
         '''Remove *stream* and all its items.  No-op if absent.'''
         raise NotImplementedError
 
-    def _most_recent_item(self, stream: str) -> Optional[dict]:
+    async def most_recent_item(self, stream: str) -> Optional[dict]:
         '''Return the last item in *stream*, or ``None`` if empty/absent.'''
         raise NotImplementedError
 
-    def _walk(self) -> Iterator[dict]:
-        '''Yield every item in every stream (arbitrary order).'''
+    async def walk(self) -> List[dict]:
+        '''Return every item in every stream (arbitrary order).
+
+        Returns a list rather than an async iterator for simplicity.
+        '''
         raise NotImplementedError
 
-    def _walk_streams(self) -> Iterator[Tuple[str, List[dict]]]:
-        '''Yield ``(stream_key, items_list)`` for every stream.
+    async def walk_streams(self) -> List[Tuple[str, List[dict]]]:
+        '''Return ``(stream_key, items_list)`` for every stream.
 
-        Subclasses should override this for efficiency.  The default
-        implementation raises ``NotImplementedError``.
+        Returns a list rather than an async iterator for simplicity.
 
         Returns
         -------
-        Iterator of (str, list of dict)
+        list of (str, list of dict)
             Each tuple contains the stream key and the full list of
             items (or tombstone records) in that stream.
         '''
@@ -982,7 +981,7 @@ class StreamStorage:
         '''
         return item.get('type') == 'tombstone'
 
-    def _collect_all_items(self) -> Tuple[Dict[str, List[dict]], Dict[str, List[dict]]]:
+    async def _collect_all_items(self) -> Tuple[Dict[str, List[dict]], Dict[str, List[dict]]]:
         '''Collect all items and tombstones, grouped by stream.
 
         Returns
@@ -994,7 +993,7 @@ class StreamStorage:
         items_by_stream: Dict[str, List[dict]] = {}
         tombstones_by_stream: Dict[str, List[dict]] = {}
 
-        for stream_key, items in self._walk_streams():
+        for stream_key, items in await self.walk_streams():
             for item in items:
                 if self._is_tombstone(item):
                     tombstones_by_stream.setdefault(stream_key, []).append(item)
@@ -1037,7 +1036,7 @@ class StreamStorage:
                 return f'{k}:{event["session"][k]}'
         return item.get('hash', '?')[:8]
 
-    def to_networkx(self):
+    async def to_networkx(self):
         '''Export the entire DAG as a :class:`networkx.DiGraph`.
 
         Each Merkle item becomes a node keyed by its hash, with
@@ -1072,7 +1071,7 @@ class StreamStorage:
             raise ImportError('networkx/pydot not installed')
 
         G = networkx.DiGraph()
-        items_by_stream, tombstones_by_stream = self._collect_all_items()
+        items_by_stream, tombstones_by_stream = await self._collect_all_items()
 
         # All known item hashes (so we can distinguish chain vs cross-ref edges)
         all_item_hashes: Set[str] = set()
@@ -1162,7 +1161,7 @@ class StreamStorage:
 
         return G
 
-    def to_graphviz(self):
+    async def to_graphviz(self):
         '''Export the entire DAG as a styled :class:`pydot.Dot` Graphviz graph.
 
         Nodes are color-coded by type:
@@ -1189,7 +1188,7 @@ class StreamStorage:
 
         Can be rendered to PNG, SVG, PDF, etc. via::
 
-            dot = storage.to_graphviz()
+            dot = await storage.to_graphviz()
             dot.write_png('merkle_dag.png')
 
         Returns
@@ -1215,7 +1214,7 @@ class StreamStorage:
         )
         G.set_node_defaults(fontname='Courier', fontsize='9')
 
-        items_by_stream, tombstones_by_stream = self._collect_all_items()
+        items_by_stream, tombstones_by_stream = await self._collect_all_items()
 
         # Track all item hashes for edge classification
         all_item_hashes: Set[str] = set()
@@ -1356,89 +1355,99 @@ class InMemoryStorage(StreamStorage):
     Suitable for tests, short-lived pipelines, and demonstrations.
     All data is lost when the process exits.
 
-    Thread safety is provided by a single ``threading.Lock`` that
-    serializes all operations.
+    Since all operations are in-memory and non-blocking, the async
+    methods are simple coroutines that return immediately.  An
+    ``asyncio.Lock`` is used to serialize concurrent access within the
+    same event loop.
     '''
 
     def __init__(self):
         super().__init__()
         self._store: Dict[str, List[dict]] = {}
-        self._lock = threading.Lock()
+        self._lock = asyncio.Lock()
 
-    def _append_to_stream(self, stream, item):
-        with self._lock:
+    async def append_to_stream(self, stream, item):
+        async with self._lock:
             self._store.setdefault(stream, []).append(item)
 
-    def _rename_or_alias_stream(self, stream, alias):
-        with self._lock:
+    async def rename_or_alias_stream(self, stream, alias):
+        async with self._lock:
             if alias == stream:
                 return
             self._store[alias] = self._store.pop(stream)
 
-    def _get_stream_data(self, stream):
-        with self._lock:
+    async def get_stream_data(self, stream):
+        async with self._lock:
             if stream not in self._store:
                 return None
             return list(self._store[stream])
 
-    def _delete_stream(self, stream):
-        with self._lock:
+    async def delete_stream(self, stream):
+        async with self._lock:
             self._store.pop(stream, None)
 
-    def _most_recent_item(self, stream):
-        with self._lock:
+    async def most_recent_item(self, stream):
+        async with self._lock:
             items = self._store.get(stream)
             if not items:
                 return None
             return items[-1]
 
-    def _walk(self):
-        with self._lock:
+    async def walk(self):
+        async with self._lock:
             snapshot = {k: list(v) for k, v in self._store.items()}
+        result = []
         for items in snapshot.values():
-            yield from items
+            result.extend(items)
+        return result
 
-    def _walk_streams(self):
-        '''Yield ``(stream_key, items_list)`` for every stream.'''
-        with self._lock:
+    async def walk_streams(self):
+        '''Return ``(stream_key, items_list)`` for every stream.'''
+        async with self._lock:
             snapshot = {k: list(v) for k, v in self._store.items()}
-        for stream_key, items in snapshot.items():
-            yield stream_key, items
+        return list(snapshot.items())
 
 
 class FSStorage(StreamStorage):
-    '''Filesystem-backed storage (one JSONL file per stream).
+    '''Filesystem-backed async storage (one JSONL file per stream).
 
     Each stream is stored as a file where every line is a single
     JSON-serialized item.  Filenames are the SHA-256 of the stream
     key to avoid path-traversal and encoding issues.
+
+    Blocking file I/O is offloaded to the default thread-pool executor
+    via :meth:`asyncio.loop.run_in_executor`.
 
     Parameters
     ----------
     path : str
         Directory in which stream files are created.  Will be created
         (including parents) if it does not exist.
+    executor : concurrent.futures.Executor, optional
+        The executor to use for blocking I/O.  ``None`` (the default)
+        uses the loop's default executor.
 
     Notes
     -----
     This backend is adequate for prototyping but has several
     performance limitations:
 
-    - ``_most_recent_item`` reads the entire file to return the last
+    - ``most_recent_item`` reads the entire file to return the last
       line.
-    - ``_rename_or_alias_stream`` is not atomic across crashes.
+    - ``rename_or_alias_stream`` is not atomic across crashes.
     - No write-ahead log or fsync guarantees.
     '''
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, executor: Optional[Executor] = None):
         super().__init__()
         self.path = path
+        self._executor = executor
         os.makedirs(path, exist_ok=True)
-        self._lock = threading.Lock()
+        # Async lock to serialize operations within the event loop
+        self._lock = asyncio.Lock()
         # Maintain a reverse mapping: filename_hash -> stream_key
-        # so _walk_streams can report meaningful keys
+        # so walk_streams can report meaningful keys
         self._key_map: Dict[str, str] = {}
-        self._key_map_lock = threading.Lock()
 
     def _fn(self, stream: str) -> str:
         '''Map a stream name to a filesystem path.
@@ -1448,141 +1457,232 @@ class FSStorage(StreamStorage):
         issues.
         '''
         safe = hashlib.sha256(stream.encode('utf-8')).hexdigest()
-        with self._key_map_lock:
-            self._key_map[safe] = stream
+        self._key_map[safe] = stream
         return os.path.join(self.path, safe)
 
-    def _append_to_stream(self, stream, item):
-        with self._lock:
-            with open(self._fn(stream), 'a') as f:
-                f.write(json_dump(item) + '\n')
+    async def _run_in_executor(self, fn, *args):
+        '''Run a blocking callable in the thread-pool executor.'''
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, fn, *args)
 
-    def _rename_or_alias_stream(self, stream, alias):
-        with self._lock:
-            src, dst = self._fn(stream), self._fn(alias)
-            if src == dst:
-                return
-            os.rename(src, dst)
+    # -- sync helpers called inside the executor -------------------------
 
-    def _get_stream_data(self, stream):
-        path = self._fn(stream)
+    @staticmethod
+    def _sync_append(path: str, data: str):
+        with open(path, 'a') as f:
+            f.write(data + '\n')
+
+    @staticmethod
+    def _sync_rename(src: str, dst: str):
+        os.rename(src, dst)
+
+    @staticmethod
+    def _sync_read(path: str) -> Optional[List[dict]]:
         if not os.path.exists(path):
             return None
         with open(path, 'r') as f:
             return [json_load(line) for line in f if line.strip()]
 
-    def _delete_stream(self, stream):
-        path = self._fn(stream)
+    @staticmethod
+    def _sync_delete(path: str):
         if os.path.exists(path):
             os.remove(path)
 
-    def _most_recent_item(self, stream):
-        data = self._get_stream_data(stream)
-        if not data:
-            return None
-        return data[-1]
+    @staticmethod
+    def _sync_listdir(directory: str) -> List[str]:
+        return os.listdir(directory)
 
-    def _walk(self):
-        for filename in os.listdir(self.path):
-            filepath = os.path.join(self.path, filename)
-            if not os.path.isfile(filepath):
-                continue
-            with open(filepath, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        yield json_load(line)
-
-    def _walk_streams(self):
-        '''Yield ``(stream_key, items_list)`` for every stream.'''
-        for filename in os.listdir(self.path):
-            filepath = os.path.join(self.path, filename)
-            if not os.path.isfile(filepath):
-                continue
-            # Recover stream key from reverse mapping if possible
-            with self._key_map_lock:
-                stream_key = self._key_map.get(filename, filename)
-            items = []
+    @staticmethod
+    def _sync_read_file(filepath: str) -> List[dict]:
+        items = []
+        if os.path.isfile(filepath):
             with open(filepath, 'r') as f:
                 for line in f:
                     line = line.strip()
                     if line:
                         items.append(json_load(line))
-            yield stream_key, items
+        return items
 
+    # -- async interface -------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Async wrapper
-# ---------------------------------------------------------------------------
+    async def append_to_stream(self, stream, item):
+        async with self._lock:
+            path = self._fn(stream)
+            data = json_dump(item)
+            await self._run_in_executor(self._sync_append, path, data)
 
-try:
-    import asyncio
-except ImportError:
-    asyncio = None  # type: ignore[assignment]
+    async def rename_or_alias_stream(self, stream, alias):
+        async with self._lock:
+            src, dst = self._fn(stream), self._fn(alias)
+            if src == dst:
+                return
+            await self._run_in_executor(self._sync_rename, src, dst)
 
+    async def get_stream_data(self, stream):
+        path = self._fn(stream)
+        return await self._run_in_executor(self._sync_read, path)
 
-class AsyncMerkle:
-    '''Async wrapper around :class:`Merkle`.
+    async def delete_stream(self, stream):
+        path = self._fn(stream)
+        await self._run_in_executor(self._sync_delete, path)
 
-    Delegates every call to ``loop.run_in_executor(None, ...)`` so
-    that blocking storage I/O does not stall an ``asyncio`` event loop.
+    async def most_recent_item(self, stream):
+        data = await self.get_stream_data(stream)
+        if not data:
+            return None
+        return data[-1]
 
-    For the :class:`InMemoryStorage` backend this is largely cosmetic,
-    but for filesystem, network, or database backends the executor
-    offload prevents event-loop starvation.
+    async def walk(self):
+        filenames = await self._run_in_executor(self._sync_listdir, self.path)
+        result = []
+        for filename in filenames:
+            filepath = os.path.join(self.path, filename)
+            items = await self._run_in_executor(self._sync_read_file, filepath)
+            result.extend(items)
+        return result
+
+    async def walk_streams(self):
+        '''Return ``(stream_key, items_list)`` for every stream.'''
+        filenames = await self._run_in_executor(self._sync_listdir, self.path)
+        result = []
+        for filename in filenames:
+            filepath = os.path.join(self.path, filename)
+            stream_key = self._key_map.get(filename, filename)
+            items = await self._run_in_executor(self._sync_read_file, filepath)
+            result.append((stream_key, items))
+        return result
+
+class KVSStorage(StreamStorage):
+    '''Storage backend that delegates to an existing ``_KVS`` instance.
+
+    Each stream is stored as a single KVS entry whose value is a JSON
+    list of items.  Every append does a read-modify-write cycle.
 
     Parameters
     ----------
-    merkle : Merkle
-        The synchronous Merkle instance to wrap.
-    loop : asyncio.AbstractEventLoop, optional
-        An explicit event loop.  If ``None``, ``asyncio.get_event_loop()``
-        is called at invocation time.
-
-    Examples
-    --------
-    ::
-
-        storage = InMemoryStorage()
-        merkle = Merkle(storage, CATEGORIES)
-        am = AsyncMerkle(merkle)
-
-        await am.start(session)
-        await am.event_to_session(event, session)
-        final_hash = await am.close_session(session)
-        assert await am.verify_chain(final_hash)
+    kvs : _KVS
+        An instantiated KVS backend (``InMemoryKVS``, ``PersistentRedisKVS``,
+        ``EphemeralRedisKVS``, ``FilesystemKVS``, etc.).
+    prefix : str, optional
+        A key prefix applied to every stream key before storage.
+        Defaults to ``"merkle:"``.
     '''
 
-    def __init__(self, merkle: Merkle, loop=None):
-        self._merkle = merkle
-        self._loop = loop
+    def __init__(self, kvs: '_KVS', prefix: str = 'merkle:'):
+        super().__init__()
+        self._kvs = kvs
+        self._prefix = prefix
+        self._lock = asyncio.Lock()
+        # Track keys ourselves because KVS.keys() may return
+        # all keys in the backend (including non-merkle ones),
+        # and some backends (Redis) decode keys differently.
+        self._known_keys: set = set()
 
-    def _get_loop(self):
-        return self._loop or asyncio.get_event_loop()
+    def _key(self, stream: str) -> str:
+        '''Prefix a stream name to produce the KVS key.'''
+        return f'{self._prefix}{stream}'
 
-    async def start(self, session, **kwargs):
-        '''Async version of :meth:`Merkle.start`.'''
-        return await self._get_loop().run_in_executor(
-            None, lambda: self._merkle.start(session, **kwargs)
-        )
+    async def append_to_stream(self, stream: str, item: dict):
+        async with self._lock:
+            key = self._key(stream)
+            data = await self._kvs[key]
+            if data is None:
+                data = []
+            if not isinstance(data, list):
+                data = []
+            data.append(item)
+            await self._kvs.set(key, data)
+            self._known_keys.add(key)
 
-    async def event_to_session(self, event, session, **kwargs):
-        '''Async version of :meth:`Merkle.event_to_session`.'''
-        return await self._get_loop().run_in_executor(
-            None, lambda: self._merkle.event_to_session(event, session, **kwargs)
-        )
+    async def rename_or_alias_stream(self, stream: str, alias: str):
+        async with self._lock:
+            if alias == stream:
+                return
+            src_key = self._key(stream)
+            dst_key = self._key(alias)
+            data = await self._kvs[src_key]
+            if data is None:
+                return
+            # Write to new key first
+            await self._kvs.set(dst_key, data)
+            self._known_keys.add(dst_key)
+            # Remove old key
+            await self._remove_key(src_key)
+            self._known_keys.discard(src_key)
 
-    async def close_session(self, session, **kwargs):
-        '''Async version of :meth:`Merkle.close_session`.'''
-        return await self._get_loop().run_in_executor(
-            None, lambda: self._merkle.close_session(session, **kwargs)
-        )
+    async def _remove_key(self, key: str):
+        '''Remove a key from the underlying KVS, trying available methods.'''
+        if hasattr(self._kvs, 'remove'):
+            await self._kvs.remove(key)
+        elif hasattr(self._kvs, '__delitem__'):
+            await self._kvs.__delitem__(key)
+        else:
+            # Last resort: overwrite with None
+            await self._kvs.set(key, None)
 
-    async def verify_chain(self, stream_key):
-        '''Async version of :meth:`Merkle.verify_chain`.'''
-        return await self._get_loop().run_in_executor(
-            None, lambda: self._merkle.verify_chain(stream_key)
-        )
+    async def get_stream_data(self, stream: str) -> Optional[List[dict]]:
+        key = self._key(stream)
+        data = await self._kvs[key]
+        if data is None:
+            return None
+        if not isinstance(data, list):
+            return None
+        return list(data)
+
+    async def delete_stream(self, stream: str):
+        key = self._key(stream)
+        await self._remove_key(key)
+        self._known_keys.discard(key)
+
+    async def most_recent_item(self, stream: str) -> Optional[dict]:
+        key = self._key(stream)
+        data = await self._kvs[key]
+        if not data or not isinstance(data, list):
+            return None
+        return data[-1]
+
+    async def walk(self) -> List[dict]:
+        result: List[dict] = []
+        for key in list(self._known_keys):
+            data = await self._kvs[key]
+            if isinstance(data, list):
+                result.extend(data)
+        return result
+
+    async def walk_streams(self) -> List[Tuple[str, List[dict]]]:
+        result: List[Tuple[str, List[dict]]] = []
+        prefix_len = len(self._prefix)
+        for key in list(self._known_keys):
+            data = await self._kvs[key]
+            if isinstance(data, list):
+                stream_name = key[prefix_len:] if key.startswith(self._prefix) else key
+                result.append((stream_name, data))
+        return result
+
+    async def debug_dump(self):
+        '''Print diagnostic info about what is actually stored.
+
+        Useful for debugging Redis integration issues.
+        '''
+        print(f'[KVSStorage debug] prefix={self._prefix!r}')
+        print(f'[KVSStorage debug] tracked keys ({len(self._known_keys)}):')
+        for key in sorted(self._known_keys):
+            data = await self._kvs[key]
+            item_count = len(data) if isinstance(data, list) else '(not a list)'
+            data_type = type(data).__name__
+            print(f'  {key!r} -> type={data_type}, items={item_count}')
+
+        # Also check what the KVS backend itself reports
+        try:
+            all_backend_keys = await self._kvs.keys()
+            merkle_keys = [k for k in all_backend_keys if k.startswith(self._prefix)]
+            print(f'[KVSStorage debug] backend keys with our prefix ({len(merkle_keys)}):')
+            for key in sorted(merkle_keys):
+                data = await self._kvs[key]
+                item_count = len(data) if isinstance(data, list) else '(not a list)'
+                print(f'  {key!r} -> items={item_count}')
+        except Exception as e:
+            print(f'[KVSStorage debug] could not enumerate backend keys: {e}')
 
 
 # ---------------------------------------------------------------------------
@@ -1603,6 +1703,7 @@ single-category parent stream.
 STORES = {
     'fs': FSStorage,
     'inmemory': InMemoryStorage,
+    'kvs': KVSStorage,
 }
 '''
 Registry of available storage backends, keyed by short name.
@@ -1613,11 +1714,10 @@ string identifier.
 
 
 # ---------------------------------------------------------------------------
-# Smoke test
+# Smoke tests
 # ---------------------------------------------------------------------------
-
-def test_case():
-    '''End-to-end smoke test exercising start -> events -> close -> verify -> delete -> visualize.'''
+async def test_case_inmemory():
+    '''Original smoke test using InMemoryStorage.'''
     storage = InMemoryStorage()
     merkle = Merkle(storage, CATEGORIES)
 
@@ -1626,64 +1726,464 @@ def test_case():
         'student': ['John'],
     }
 
-    merkle.start(session)
-    merkle.event_to_session({'type': 'event', 'payload': 'A'}, session, label='A')
-    merkle.event_to_session({'type': 'event', 'payload': 'B'}, session, label='B')
-    merkle.event_to_session({'type': 'event', 'payload': 'C'}, session, label='C')
-    final_hash = merkle.close_session(session)
+    await merkle.start(session)
+    await merkle.event_to_session({'type': 'event', 'payload': 'A'}, session, label='A')
+    await merkle.event_to_session({'type': 'event', 'payload': 'B'}, session, label='B')
+    await merkle.event_to_session({'type': 'event', 'payload': 'C'}, session, label='C')
+    final_hash = await merkle.close_session(session)
 
-    # Verify the closed session chain
-    assert merkle.verify_chain(final_hash)
-    print(f'Chain verified: {final_hash}')
+    assert await merkle.verify_chain(final_hash)
+    print(f'[inmemory] Chain verified: {final_hash}')
 
-    # Verify parent chains
-    for parent_key in [json_dump({'teacher': 'Mr. A'}), json_dump({'student': 'John'})]:
-        data = storage._get_stream_data(parent_key)
+    for parent_key in [json_dump({'student': 'John'}), json_dump({'teacher': 'Mr. A'})]:
+        data = await storage.get_stream_data(parent_key)
         if data:
-            print(f'Parent stream {parent_key[:40]}... has {len(data)} item(s)')
+            print(f'[inmemory] Parent stream {parent_key[:40]}... has {len(data)} item(s)')
 
-    # Test tombstone deletion
-    tombstone = merkle.delete_stream_with_tombstone(final_hash, reason='GDPR request')
-    print(f'Tombstone: {tombstone["tombstone_hash"]}')
-    assert storage._get_stream_data(final_hash) is None
-    print('All checks passed.')
+    tombstone = await merkle.delete_stream_with_tombstone(final_hash, reason='GDPR request')
+    print(f'[inmemory] Tombstone: {tombstone["tombstone_hash"]}')
+    assert await storage.get_stream_data(final_hash) is None
+    print('[inmemory] All checks passed.')
 
-    # Test visualization (if dependencies available)
-    if HAS_VIZ:
-        print('\nGenerating visualizations...')
 
-        # NetworkX export
-        G = storage.to_networkx()
-        print(f'NetworkX graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
+async def test_case_kvs_basic():
+    '''Basic start -> events -> close -> verify cycle on KVSStorage.'''
+    from learning_observer.kvs import InMemoryKVS as KVSInMemory
 
-        # Check that tombstone node exists
-        tombstone_nodes = [n for n, d in G.nodes(data=True) if d.get('tombstone')]
-        print(f'Tombstone nodes: {len(tombstone_nodes)}')
+    kvs_backend = KVSInMemory()
+    storage = KVSStorage(kvs_backend)
+    merkle = Merkle(storage, CATEGORIES)
 
-        # Check deleted placeholder nodes exist
-        deleted_nodes = [n for n, d in G.nodes(data=True)
-                         if d.get('classification') == 'deleted']
-        print(f'Deleted placeholder nodes: {len(deleted_nodes)}')
+    session = {
+        'teacher': ['Ms. B'],
+        'student': ['Alice'],
+    }
 
-        # Check edge types
-        edge_types = {}
-        for u, v, d in G.edges(data=True):
-            et = d.get('edge_type', 'unknown')
-            edge_types[et] = edge_types.get(et, 0) + 1
-        print(f'Edge types: {edge_types}')
+    await merkle.start(session)
+    await merkle.event_to_session({'type': 'event', 'payload': 'X'}, session, label='X')
+    await merkle.event_to_session({'type': 'event', 'payload': 'Y'}, session, label='Y')
+    final_hash = await merkle.close_session(session)
 
-        # Graphviz export
-        dot = storage.to_graphviz()
-        print(f'Graphviz DOT: {len(dot.get_node_list())} nodes, '
-              f'{len(dot.get_edge_list())} edges')
+    assert await merkle.verify_chain(final_hash)
+    print(f'[kvs-basic] Chain verified: {final_hash}')
 
-        # Optionally write to file
-        # dot.write_png('merkle_dag.png')
-        # dot.write_svg('merkle_dag.svg')
-        print('Visualization generation complete.')
-    else:
-        print('Skipping visualization (networkx/pydot not installed)')
+    # Confirm the stream was renamed (old session key should be gone)
+    old_key = session_key(session)
+    assert await storage.get_stream_data(old_key) is None, \
+        'Session key should be removed after close'
+
+    # Confirm the stream is retrievable by final hash
+    data = await storage.get_stream_data(final_hash)
+    assert data is not None and len(data) == 4, \
+        f'Expected 4 items (start + 2 events + close), got {len(data) if data else 0}'
+    print(f'[kvs-basic] Stream has {len(data)} items as expected.')
+
+    # Confirm parent streams were propagated
+    for parent_key in [json_dump({'student': 'Alice'}), json_dump({'teacher': 'Ms. B'})]:
+        parent_data = await storage.get_stream_data(parent_key)
+        assert parent_data is not None and len(parent_data) >= 1, \
+            f'Parent stream {parent_key[:30]}... should have at least 1 item'
+        print(f'[kvs-basic] Parent stream {parent_key[:30]}... has {len(parent_data)} item(s)')
+
+    print('[kvs-basic] All checks passed.')
+
+
+async def test_case_kvs_tombstone():
+    '''Tombstone deletion on KVSStorage.'''
+    from learning_observer.kvs import InMemoryKVS as KVSInMemory
+
+    kvs_backend = KVSInMemory()
+    storage = KVSStorage(kvs_backend)
+    merkle = Merkle(storage, CATEGORIES)
+
+    session = {'student': ['Bob']}
+
+    await merkle.start(session)
+    await merkle.event_to_session({'type': 'event', 'payload': 'secret'}, session, label='secret')
+    final_hash = await merkle.close_session(session)
+
+    assert await merkle.verify_chain(final_hash)
+    print(f'[kvs-tombstone] Chain verified before deletion: {final_hash}')
+
+    # Delete with tombstone
+    tombstone = await merkle.delete_stream_with_tombstone(final_hash, reason='GDPR Art. 17')
+    print(f'[kvs-tombstone] Tombstone hash: {tombstone["tombstone_hash"]}')
+
+    # Original stream should be gone
+    assert await storage.get_stream_data(final_hash) is None, \
+        'Deleted stream should return None'
+
+    # Tombstone should be stored
+    tombstone_key = f'__tombstone__{final_hash}'
+    tombstone_data = await storage.get_stream_data(tombstone_key)
+    assert tombstone_data is not None and len(tombstone_data) == 1, \
+        'Tombstone stream should have exactly 1 record'
+    assert tombstone_data[0]['type'] == 'tombstone'
+    assert tombstone_data[0]['reason'] == 'GDPR Art. 17'
+    assert tombstone_data[0]['item_count'] == 3  # start + event + close
+    print(f'[kvs-tombstone] Tombstone record verified: {tombstone_data[0]["item_count"]} items recorded.')
+
+    # Attempting to delete again should raise
+    try:
+        await merkle.delete_stream_with_tombstone(final_hash, reason='duplicate')
+        assert False, 'Should have raised ValueError'
+    except ValueError:
+        print('[kvs-tombstone] Double-delete correctly rejected.')
+
+    print('[kvs-tombstone] All checks passed.')
+
+
+async def test_case_kvs_break_session():
+    '''Session break (segmentation) on KVSStorage.'''
+    from learning_observer.kvs import InMemoryKVS as KVSInMemory
+
+    kvs_backend = KVSInMemory()
+    storage = KVSStorage(kvs_backend)
+    merkle = Merkle(storage, CATEGORIES)
+
+    session = {'student': ['Carol'], 'tool': ['notebook']}
+
+    await merkle.start(session)
+    await merkle.event_to_session({'type': 'event', 'payload': 'part1'}, session, label='part1')
+
+    # Break the session — closes segment 1, starts segment 2
+    segment1_hash = await merkle.break_session(session)
+    print(f'[kvs-break] Segment 1 hash: {segment1_hash}')
+
+    # Verify segment 1
+    assert await merkle.verify_chain(segment1_hash)
+    print('[kvs-break] Segment 1 verified.')
+
+    # Continue in segment 2
+    await merkle.event_to_session({'type': 'event', 'payload': 'part2'}, session, label='part2')
+    final_hash = await merkle.close_session(session)
+    print(f'[kvs-break] Segment 2 (final) hash: {final_hash}')
+
+    # Verify segment 2
+    assert await merkle.verify_chain(final_hash)
+    print('[kvs-break] Segment 2 verified.')
+
+    # Segment 2 should reference segment 1 via the continuation link
+    seg2_data = await storage.get_stream_data(final_hash)
+    assert seg2_data is not None
+    first_item = seg2_data[0]
+    assert first_item['event']['type'] == 'continue'
+    assert first_item['event']['continues'] == segment1_hash
+    assert segment1_hash in first_item['children'], \
+        'Continuation item should include segment 1 hash in children'
+    print('[kvs-break] Cross-segment linkage confirmed.')
+
+    print('[kvs-break] All checks passed.')
+
+
+async def test_case_kvs_walk():
+    '''walk() and walk_streams() on KVSStorage.'''
+    from learning_observer.kvs import InMemoryKVS as KVSInMemory
+
+    kvs_backend = KVSInMemory()
+    storage = KVSStorage(kvs_backend)
+    merkle = Merkle(storage, CATEGORIES)
+
+    # Create two separate sessions
+    session_a = {'student': ['Dave']}
+    session_b = {'student': ['Eve']}
+
+    await merkle.start(session_a)
+    await merkle.event_to_session({'type': 'event', 'payload': 'a1'}, session_a)
+    hash_a = await merkle.close_session(session_a)
+
+    await merkle.start(session_b)
+    await merkle.event_to_session({'type': 'event', 'payload': 'b1'}, session_b)
+    await merkle.event_to_session({'type': 'event', 'payload': 'b2'}, session_b)
+    hash_b = await merkle.close_session(session_b)
+
+    # walk() should return all items across all streams
+    all_items = await storage.walk()
+    print(f'[kvs-walk] Total items across all streams: {len(all_items)}')
+    assert len(all_items) > 0
+
+    # walk_streams() should return identifiable stream groups
+    streams = await storage.walk_streams()
+    stream_keys = [s[0] for s in streams]
+    print(f'[kvs-walk] Streams found: {len(streams)}')
+    for key, items in streams:
+        display = key if len(key) <= 40 else key[:37] + '...'
+        print(f'  [{display}] -> {len(items)} item(s)')
+
+    # The closed session streams should appear under their final hashes
+    assert any(k == hash_a for k in stream_keys), \
+        f'Stream {hash_a[:16]}... not found in walk_streams'
+    assert any(k == hash_b for k in stream_keys), \
+        f'Stream {hash_b[:16]}... not found in walk_streams'
+
+    print('[kvs-walk] All checks passed.')
+
+
+async def test_case_kvs_prefix_isolation():
+    '''Two KVSStorage instances with different prefixes sharing the same KVS backend.'''
+    from learning_observer.kvs import InMemoryKVS as KVSInMemory
+
+    kvs_backend = KVSInMemory()
+    storage_a = KVSStorage(kvs_backend, prefix='merkle_a:')
+    storage_b = KVSStorage(kvs_backend, prefix='merkle_b:')
+    merkle_a = Merkle(storage_a, CATEGORIES)
+    merkle_b = Merkle(storage_b, CATEGORIES)
+
+    session = {'student': ['Frank']}
+
+    # Write to storage_a
+    await merkle_a.start(session)
+    await merkle_a.event_to_session({'type': 'event', 'payload': 'from_a'}, session)
+    hash_a = await merkle_a.close_session(session)
+
+    # Write to storage_b with the same session descriptor
+    await merkle_b.start(session)
+    await merkle_b.event_to_session({'type': 'event', 'payload': 'from_b'}, session)
+    hash_b = await merkle_b.close_session(session)
+
+    # Both should verify independently
+    assert await merkle_a.verify_chain(hash_a)
+    assert await merkle_b.verify_chain(hash_b)
+    print(f'[kvs-prefix] Chain A verified: {hash_a[:16]}...')
+    print(f'[kvs-prefix] Chain B verified: {hash_b[:16]}...')
+
+    # walk_streams should only see items from their own prefix
+    streams_a = await storage_a.walk_streams()
+    streams_b = await storage_b.walk_streams()
+
+    items_a = await storage_a.walk()
+    items_b = await storage_b.walk()
+
+    # They should not overlap (different payloads, different timestamps → different hashes)
+    hashes_a = {item['hash'] for item in items_a if 'hash' in item}
+    hashes_b = {item['hash'] for item in items_b if 'hash' in item}
+    overlap = hashes_a & hashes_b
+    # Parent streams for the same student may not overlap because timestamps differ,
+    # but the closed-session hashes definitely shouldn't match
+    assert hash_a not in hashes_b, 'Hash A leaked into storage B'
+    assert hash_b not in hashes_a, 'Hash B leaked into storage A'
+    print(f'[kvs-prefix] Storage A: {len(streams_a)} streams, {len(items_a)} items')
+    print(f'[kvs-prefix] Storage B: {len(streams_b)} streams, {len(items_b)} items')
+
+    print('[kvs-prefix] All checks passed.')
+
+
+async def test_case_kvs_verify_tamper_detection():
+    '''Verify that tampering with a stored item is detected.'''
+    from learning_observer.kvs import InMemoryKVS as KVSInMemory
+
+    kvs_backend = KVSInMemory()
+    storage = KVSStorage(kvs_backend)
+    merkle = Merkle(storage, CATEGORIES)
+
+    session = {'student': ['Grace']}
+
+    await merkle.start(session)
+    await merkle.event_to_session({'type': 'event', 'payload': 'original'}, session)
+    final_hash = await merkle.close_session(session)
+
+    # Verify clean chain
+    assert await merkle.verify_chain(final_hash)
+    print('[kvs-tamper] Clean chain verified.')
+
+    # Now tamper: modify the event payload of the middle item
+    kvs_key = f'{storage._prefix}{final_hash}'
+    data = await kvs_backend[kvs_key]
+    assert data is not None and len(data) == 3  # start + event + close
+
+    # Corrupt the second item's event
+    data[1]['event']['payload'] = 'TAMPERED'
+    await kvs_backend.set(kvs_key, data)
+
+    # Verification should now fail
+    try:
+        await merkle.verify_chain(final_hash)
+        assert False, 'Tampered chain should have failed verification'
+    except ValueError as e:
+        print(f'[kvs-tamper] Tamper correctly detected: {e}')
+
+    print('[kvs-tamper] All checks passed.')
+
+
+async def test_case_kvs_visualization():
+    '''Visualization export on KVSStorage (only runs if networkx/pydot available).'''
+    if not HAS_VIZ:
+        print('[kvs-viz] Skipping (networkx/pydot not installed)')
+        return
+
+    from learning_observer.kvs import InMemoryKVS as KVSInMemory
+
+    kvs_backend = KVSInMemory()
+    storage = KVSStorage(kvs_backend)
+    merkle = Merkle(storage, CATEGORIES)
+
+    session = {'student': ['Heidi'], 'tool': ['canvas']}
+
+    await merkle.start(session)
+    await merkle.event_to_session({'type': 'event', 'payload': 'draw'}, session, label='draw')
+    await merkle.event_to_session({'type': 'event', 'payload': 'erase'}, session, label='erase')
+    final_hash = await merkle.close_session(session)
+
+    # Delete the session to get a tombstone in the graph
+    tombstone = await merkle.delete_stream_with_tombstone(final_hash, reason='test cleanup')
+
+    # NetworkX export
+    G = await storage.to_networkx()
+    tombstone_nodes = [n for n, d in G.nodes(data=True) if d.get('tombstone')]
+    deleted_nodes = [n for n, d in G.nodes(data=True) if d.get('classification') == 'deleted']
+    edge_types = {}
+    for u, v, d in G.edges(data=True):
+        et = d.get('edge_type', 'unknown')
+        edge_types[et] = edge_types.get(et, 0) + 1
+
+    print(f'[kvs-viz] NetworkX: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
+    print(f'[kvs-viz] Tombstone nodes: {len(tombstone_nodes)}')
+    print(f'[kvs-viz] Deleted placeholders: {len(deleted_nodes)}')
+    print(f'[kvs-viz] Edge types: {edge_types}')
+
+    assert len(tombstone_nodes) >= 1, 'Should have at least one tombstone node'
+    assert len(deleted_nodes) >= 1, 'Should have at least one deleted placeholder'
+
+    # Graphviz export
+    dot = await storage.to_graphviz()
+    print(f'[kvs-viz] Graphviz: {len(dot.get_node_list())} nodes, {len(dot.get_edge_list())} edges')
+
+    print('[kvs-viz] All checks passed.')
+
+
+async def test_case_kvs_redis():
+    '''Full lifecycle on KVSStorage backed by a real Redis instance.
+
+    This test bootstraps the Learning Observer settings system via
+    ``learning_observer.offline.init()`` so that the Redis connection
+    can resolve its host/port/password from the standard config.  If
+    the settings system or Redis is unavailable, the test is skipped
+    gracefully.
+    '''
+    # --- bootstrap the settings system --------------------------------
+    try:
+        import learning_observer.offline
+        learning_observer.offline.init()
+    except Exception as e:
+        raise e
+        print(f'[kvs-redis] Skipping — could not initialize settings: {e}')
+        return
+
+    # --- get the KVS that init() wired up -----------------------------
+    try:
+        from learning_observer.kvs import KVS
+        kvs_backend = KVS()
+        await kvs_backend.set('__merkle_redis_ping__', 'pong')
+        pong = await kvs_backend['__merkle_redis_ping__']
+        assert pong == 'pong', f'Redis ping failed: got {pong!r}'
+        print('[kvs-redis] Redis connection confirmed.')
+    except Exception as e:
+        print(f'[kvs-redis] Skipping — could not connect to Redis: {e}')
+        return
+
+    import time
+    prefix = f'merkle_test_{int(time.time())}:'
+    storage = KVSStorage(kvs_backend, prefix=prefix)
+    merkle = Merkle(storage, CATEGORIES)
+
+    session = {
+        'teacher': ['Dr. Redis'],
+        'student': ['Ivy'],
+        'tool': ['terminal'],
+    }
+
+    # --- lifecycle ----------------------------------------------------
+    await merkle.start(session, metadata={'test': True})
+    await merkle.event_to_session(
+        {'type': 'event', 'payload': 'command_1'}, session, label='cmd1',
+    )
+    await merkle.event_to_session(
+        {'type': 'event', 'payload': 'command_2'}, session, label='cmd2',
+    )
+    final_hash = await merkle.close_session(session)
+    print(f'[kvs-redis] Session closed: {final_hash}')
+
+    # --- debug: show what's actually in Redis -------------------------
+    await storage.debug_dump()
+
+    # --- verify -------------------------------------------------------
+    assert await merkle.verify_chain(final_hash)
+    print('[kvs-redis] Chain verified.')
+
+    data = await storage.get_stream_data(final_hash)
+    assert data is not None, 'Stream data is None — rename may have failed'
+    assert len(data) == 4, f'Expected 4 items (start + 2 events + close), got {len(data)}'
+    print(f'[kvs-redis] Stream has {len(data)} items.')
+
+    # --- parents ------------------------------------------------------
+    for parent_key in [json_dump({'student': 'Ivy'}), json_dump({'teacher': 'Dr. Redis'}),
+                       json_dump({'tool': 'terminal'})]:
+        parent_data = await storage.get_stream_data(parent_key)
+        assert parent_data is not None and len(parent_data) >= 1
+        print(f'[kvs-redis] Parent {parent_key[:30]}... OK ({len(parent_data)} items)')
+
+    # --- tombstone ----------------------------------------------------
+    tombstone = await merkle.delete_stream_with_tombstone(final_hash, reason='GDPR test')
+    assert await storage.get_stream_data(final_hash) is None
+    tombstone_data = await storage.get_stream_data(f'__tombstone__{final_hash}')
+    assert tombstone_data is not None and len(tombstone_data) == 1
+    assert tombstone_data[0]['item_count'] == 4
+    print(f'[kvs-redis] Tombstone verified.')
+
+    # --- final debug dump ---------------------------------------------
+    await storage.debug_dump()
+
+    # --- cleanup ------------------------------------------------------
+    try:
+        all_keys = await kvs_backend.keys()
+        test_keys = [k for k in all_keys if k.startswith(prefix)]
+        if hasattr(kvs_backend, 'remove'):
+            for k in test_keys:
+                await kvs_backend.remove(k)
+        print(f'[kvs-redis] Cleaned up {len(test_keys)} test keys.')
+    except Exception as e:
+        print(f'[kvs-redis] Cleanup warning: {e}')
+
+    print('[kvs-redis] All checks passed.')
+
+
+async def test_all():
+    '''Run all test cases.'''
+    tests = [
+        ('InMemoryStorage', test_case_inmemory),
+        ('KVS Basic', test_case_kvs_basic),
+        ('KVS Tombstone', test_case_kvs_tombstone),
+        ('KVS Break Session', test_case_kvs_break_session),
+        ('KVS Walk', test_case_kvs_walk),
+        ('KVS Prefix Isolation', test_case_kvs_prefix_isolation),
+        ('KVS Tamper Detection', test_case_kvs_verify_tamper_detection),
+        ('KVS Visualization', test_case_kvs_visualization),
+        ('KVS Redis Integration', test_case_kvs_redis),
+    ]
+
+    passed = 0
+    failed = 0
+    skipped = 0
+    for name, test_fn in tests:
+        print(f'\n{"="*60}')
+        print(f'Running: {name}')
+        print(f'{"="*60}')
+        try:
+            await test_fn()
+            passed += 1
+        except Exception as e:
+            failed += 1
+            print(f'FAILED: {name}')
+            import traceback
+            traceback.print_exc()
+
+    print(f'\n{"="*60}')
+    print(f'Results: {passed} passed, {failed} failed, {passed + failed} total')
+    print(f'{"="*60}')
+
+    if failed > 0:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':
-    test_case()
+    asyncio.run(test_all())
