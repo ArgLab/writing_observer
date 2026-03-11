@@ -15,6 +15,7 @@ import inspect
 import json
 import logging
 import os
+import pmss
 import time
 import traceback
 import uuid
@@ -45,6 +46,30 @@ import learning_observer.merkle_store as merkle_store
 import learning_observer.constants as constants
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_max_websocket_message_bytes(value):
+    if isinstance(value, bool):
+        raise ValueError('incoming_max_websocket_message_bytes must be an integer value.')
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('incoming_max_websocket_message_bytes must be an integer value.') from exc
+    if parsed <= 0:
+        raise ValueError('incoming_max_websocket_message_bytes must be greater than zero.')
+    return parsed
+
+
+pmss.parser(
+    'incoming_max_websocket_message_bytes',
+    transform=_parse_max_websocket_message_bytes,
+)
+pmss.register_field(
+    name='incoming_max_websocket_message_bytes',
+    type='incoming_max_websocket_message_bytes',
+    description='Maximum decompressed websocket message size accepted by the incoming event endpoint.',
+    default=16 * 1024 * 1024,
+)
 
 
 def compile_server_data(request):
@@ -257,17 +282,9 @@ def event_decoder_and_logger(
     If the ``merkle`` feature flag is not set, falls back to the legacy
     flat-file logger (which needs no identity).
     '''
-
-    if merkle_config := settings.feature_flag('merkle'):
+    merkle = merkle_store.get_merkle_engine()
+    if merkle is not None:
         # ---- Merkle path ------------------------------------------------
-        storage_cls = merkle_store.STORES[merkle_config['store']]
-        params = merkle_config.get('params', {})
-        if not isinstance(params, dict):
-            raise ValueError('Merkle store params must be a dict')
-
-        storage = storage_cls(**params)
-        merkle = merkle_store.Merkle(storage, merkle_store.CATEGORIES)
-        async_merkle = merkle_store.AsyncMerkle(merkle)
 
         # --- Deferred session state ---
         session = None
@@ -295,28 +312,44 @@ def event_decoder_and_logger(
                 'tool': [tool],
             }
 
-            await async_merkle.start(session, metadata=metadata)
+            # Filter sensitive fields out of metadata before persisting
+            safe_metadata = {
+                k: v for k, v in (metadata or {}).items()
+                if k not in ('auth', 'password', 'token')
+            }
+            await merkle.start(session, metadata=safe_metadata)
 
             if headers:
-                await async_merkle.event_to_session(
+                await merkle.event_to_session(
                     {'type': 'header', 'headers': headers},
                     session,
                     label='headers',
                 )
 
             # Replay everything we buffered before identity was known
+            buffer_count = len(pre_session_buffer)
             for buffered_event in pre_session_buffer:
-                await async_merkle.event_to_session(buffered_event, session)
+                # Skip auth-protocol events — they were consumed by the
+                # auth system and shouldn't be persisted to the chain
+                if buffered_event.get('_consumed_by_auth'):
+                    continue
+                await merkle.event_to_session(buffered_event, session)
             pre_session_buffer.clear()
 
             session_started = True
             logger.debug(
                 'Merkle session initialized for student=%s tool=%s; '
                 'flushed %d buffered events',
-                student, tool, len(pre_session_buffer),
+                student, tool, buffer_count,
             )
 
         async def close_session():
+            '''Close the Merkle session.
+
+            Idempotent: safe to call multiple times (e.g. from both the
+            generator's ``finally`` block and an explicit ``terminate``
+            event).
+            '''
             nonlocal session_closed
             if session_closed:
                 return
@@ -324,13 +357,13 @@ def event_decoder_and_logger(
 
             if session_started:
                 try:
-                    await async_merkle.close_session(session)
+                    await merkle.close_session(session)
                 except Exception:
                     logger.exception('Failed to close merkle session')
             elif pre_session_buffer:
-                # Connection died before we ever learned who the student was.
-                # The events are not lost (they're in the buffer), but they
-                # never made it into a Merkle chain. Log loudly.
+                # Connection died before we ever learned who the student
+                # was.  The events are not lost (they're in the buffer),
+                # but they never made it into a Merkle chain.
                 logger.warning(
                     'Merkle session closed before initialization; '
                     '%d event(s) buffered but never persisted to a session.',
@@ -348,7 +381,7 @@ def event_decoder_and_logger(
                     )
 
                     if session_started:
-                        await async_merkle.event_to_session(json_event, session)
+                        await merkle.event_to_session(json_event, session)
                     else:
                         # Identity not yet known — buffer for later flush
                         pre_session_buffer.append(json_event)
@@ -422,7 +455,10 @@ async def incoming_websocket_handler(request):
     we start processing each event in our queue through the reducers.
     '''
     debug_log("Incoming web socket connected")
-    ws = aiohttp.web.WebSocketResponse()
+    ws_max_message_bytes = settings.pmss_settings.incoming_max_websocket_message_bytes(
+        types=['incoming_events']
+    )
+    ws = aiohttp.web.WebSocketResponse(max_msg_size=ws_max_message_bytes)
     await ws.prepare(request)
     lock_fields = {}
     authenticated = False

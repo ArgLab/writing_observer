@@ -133,11 +133,14 @@ import asyncio
 import hashlib
 import json
 import datetime
+import logging
 import os
 import threading
 from typing import Any, Dict, List, Optional, Set, Iterator, Tuple, Union
 from dataclasses import dataclass, field
 from concurrent.futures import Executor
+
+import learning_observer.settings as settings
 
 try:
     import pydot
@@ -145,6 +148,69 @@ try:
     HAS_VIZ = True
 except ImportError:
     HAS_VIZ = False
+
+logger = logging.getLogger(__name__)
+
+_merkle_engine = None
+_merkle_storage = None
+
+
+def get_merkle_engine():
+    """Return the application-scoped Merkle engine singleton.
+
+    Lazily initializes the storage backend and ``Merkle`` engine on
+    first call.  Subsequent calls return the same instance.
+
+    The storage class is determined by the ``store`` key in the
+    ``merkle`` feature-flag config.  If the key is absent or the
+    feature flag is a bare ``true``, falls back to
+    :data:`DEFAULT_STORE` (in-memory).
+
+    Returns
+    -------
+    Merkle or None
+        ``None`` if the ``merkle`` feature flag is not enabled.
+    """
+    global _merkle_engine, _merkle_storage
+
+    if _merkle_engine is not None:
+        return _merkle_engine
+
+    merkle_config = settings.feature_flag('merkle')
+    if not merkle_config:
+        return None
+
+    # A bare `merkle: true` gives us a bool, not a dict
+    if not isinstance(merkle_config, dict):
+        merkle_config = {}
+
+    store_name = merkle_config.get('store', DEFAULT_STORE)
+    if store_name not in STORES:
+        logger.warning(
+            "Unknown merkle store %r; falling back to %r",
+            store_name,
+            DEFAULT_STORE,
+        )
+        store_name = DEFAULT_STORE
+
+    storage_cls = STORES[store_name]
+    params = merkle_config.get('params', {})
+    if not isinstance(params, dict):
+        logger.warning(
+            "Merkle store params should be a dict, got %s; ignoring",
+            type(params).__name__,
+        )
+        params = {}
+
+    _merkle_storage = storage_cls(**params)
+    _merkle_engine = Merkle(_merkle_storage, CATEGORIES)
+
+    logger.info(
+        "Merkle engine initialized with %s backend (params: %s)",
+        store_name,
+        params or '(none)',
+    )
+    return _merkle_engine
 
 
 # ---------------------------------------------------------------------------
@@ -1705,6 +1771,7 @@ STORES = {
     'inmemory': InMemoryStorage,
     'kvs': KVSStorage,
 }
+DEFAULT_STORE = 'inmemory'
 '''
 Registry of available storage backends, keyed by short name.
 
