@@ -15,7 +15,6 @@ A cryptographically verifiable, append-only log storage system for education eve
 4. [Streaming Pipeline Integration](#streaming-pipeline-integration)
 5. [API Reference](#api-reference)
    - [Merkle](#merkle)
-   - [AsyncMerkle](#asyncmerkle)
    - [Storage Backends](#storage-backends)
 6. [Verification & Audit](#verification--audit)
    - [What Exactly Is Verified?](#what-exactly-is-verified)
@@ -115,28 +114,34 @@ pip install networkx pydot
 ### Minimal Example
 
 ```python
+import asyncio
 from merkle_store import InMemoryStorage, Merkle, CATEGORIES
 
-storage = InMemoryStorage()
-merkle = Merkle(storage, CATEGORIES)
 
-session = {"student": ["Alice"], "tool": ["editor"]}
+async def main():
+    storage = InMemoryStorage()
+    merkle = Merkle(storage, CATEGORIES)
 
-# 1. Open
-merkle.start(session, metadata={"client_version": "1.2.0"})
+    session = {"student": ["Alice"], "tool": ["editor"]}
 
-# 2. Append events
-merkle.event_to_session({"type": "keystroke", "key": "a"}, session)
-merkle.event_to_session({"type": "keystroke", "key": "b"}, session)
-merkle.event_to_session({"type": "submit"},                session)
+    # 1. Open
+    await merkle.start(session, metadata={"client_version": "1.2.0"})
 
-# 3. Close — returns the final content hash
-final_hash = merkle.close_session(session)
-print(f"Session hash: {final_hash}")
+    # 2. Append events
+    await merkle.event_to_session({"type": "keystroke", "key": "a"}, session)
+    await merkle.event_to_session({"type": "keystroke", "key": "b"}, session)
+    await merkle.event_to_session({"type": "submit"}, session)
 
-# 4. Verify
-assert merkle.verify_chain(final_hash)
-print("Chain integrity verified ✓")
+    # 3. Close — returns the final content hash
+    final_hash = await merkle.close_session(session)
+    print(f"Session hash: {final_hash}")
+
+    # 4. Verify
+    assert await merkle.verify_chain(final_hash)
+    print("Chain integrity verified ✓")
+
+
+asyncio.run(main())
 ```
 
 ### Using Filesystem Storage
@@ -146,7 +151,7 @@ from merkle_store import FSStorage, Merkle, CATEGORIES
 
 storage = FSStorage(path="/var/data/merkle_streams")
 merkle = Merkle(storage, CATEGORIES)
-# ... same API as above ...
+# ... same async API as above (`await merkle.start(...)`, etc.) ...
 ```
 
 Each stream becomes a JSONL file under `/var/data/merkle_streams/`. The filename is the SHA-256 of the stream key.
@@ -173,7 +178,7 @@ In production, the Merkle logger runs inside an async generator pipeline that si
 
 ```python
 from merkle_store import (
-    InMemoryStorage, FSStorage, Merkle, AsyncMerkle,
+    InMemoryStorage, FSStorage, Merkle,
     CATEGORIES, STORES,
 )
 
@@ -181,18 +186,17 @@ from merkle_store import (
 storage_cls = STORES[config["store"]]       # "inmemory" or "fs"
 storage = storage_cls(**config.get("params", {}))
 merkle = Merkle(storage, CATEGORIES)
-async_merkle = AsyncMerkle(merkle)
 
 session = {"student": [request.student], "tool": [request.tool]}
 
 # --- async generator that logs and forwards events ---
 async def decode_and_log(events):
-    await async_merkle.start(session, metadata=metadata)
+    await merkle.start(session, metadata=metadata)
     async for msg in events:
         event = msg if isinstance(msg, dict) else json.loads(msg.data)
-        await async_merkle.event_to_session(event, session)
+        await merkle.event_to_session(event, session)
         yield event                # forward downstream
-    await async_merkle.close_session(session)
+    await merkle.close_session(session)
 ```
 
 The pipeline is transparent: downstream consumers receive the same events they would without the Merkle layer. The only side effect is that every event is also appended to the Merkle chain.
@@ -205,16 +209,12 @@ The pipeline is transparent: downstream consumers receive the same events they w
 
 | Method | Description |
 |--------|-------------|
-| `start(session, metadata=None, continuation_hash=None)` | Open a new session stream. If `continuation_hash` is provided, records it as a `continue` event that links to a prior segment. |
-| `event_to_session(event, session, children=None, label=None)` | Append an event to the running stream. Returns the persisted item dict. |
-| `close_session(session, logical_break=False)` | Append a `close` event, content-address the stream, propagate to parents. Returns the final hash. |
-| `break_session(session)` | Close the current segment and immediately start a continuation. Returns the closed segment's hash. |
-| `verify_chain(stream_key)` | Walk the stream and verify all three invariants (event inclusion, chain linkage, hash correctness). Returns `True` or raises `ValueError`. |
-| `delete_stream_with_tombstone(stream_key, reason)` | Remove event data; leave a tombstone with hash skeleton and reason. Returns the tombstone dict. |
-
-### `AsyncMerkle`
-
-Wraps a `Merkle` instance and exposes `async` versions of `start`, `event_to_session`, `close_session`, and `verify_chain`. All calls are dispatched to the default executor via `loop.run_in_executor`.
+| `await start(session, metadata=None, continuation_hash=None)` | Open a new session stream. If `continuation_hash` is provided, records it as a `continue` event that links to a prior segment. |
+| `await event_to_session(event, session, children=None, label=None)` | Append an event to the running stream. Returns the persisted item dict. |
+| `await close_session(session, logical_break=False)` | Append a `close` event, content-address the stream, propagate to parents. Returns the final hash. |
+| `await break_session(session)` | Close the current segment and immediately start a continuation. Returns the closed segment's hash. |
+| `await verify_chain(stream_key)` | Walk the stream and verify all three invariants (event inclusion, chain linkage, hash correctness). Returns `True` or raises `ValueError`. |
+| `await delete_stream_with_tombstone(stream_key, reason)` | Remove event data; leave a tombstone with hash skeleton and reason. Returns the tombstone dict. |
 
 ### Storage Backends
 
@@ -252,15 +252,11 @@ Together these guarantee:
 ### Running Verification
 
 ```python
-# Synchronous
 try:
-    merkle.verify_chain(final_hash)
+    await merkle.verify_chain(final_hash)
     print("Integrity OK")
 except ValueError as e:
     print(f"INTEGRITY VIOLATION: {e}")
-
-# Async
-assert await async_merkle.verify_chain(final_hash)
 ```
 
 ### Why This Is Safe
@@ -297,7 +293,7 @@ Data-subject erasure requests (GDPR Article 17, CCPA, FERPA, etc.) require remov
 ### How Tombstones Work
 
 ```python
-tombstone = merkle.delete_stream_with_tombstone(
+tombstone = await merkle.delete_stream_with_tombstone(
     stream_key=final_hash,
     reason="GDPR Article 17 erasure request from guardian",
 )
@@ -516,7 +512,7 @@ The `HASH_TRUNCATE` setting exists **only** for debugging readability. In produc
 | Limitation | Production Fix |
 |------------|----------------|
 | In-memory and single-file-per-stream backends don't scale | Kafka, S3, or database backend |
-| `run_in_executor` wrapping is a stopgap for async | Native async I/O in the storage backend |
+| `FSStorage` uses `run_in_executor` around blocking file calls | Native async filesystem I/O backend (or move to Kafka/S3/database backends) |
 | `FSStorage._most_recent_item` reads the entire file | Maintain an in-memory index or use a database |
 | No periodic root-hash publication | Scheduled job that computes and publishes a Merkle root over all parent-stream tips |
 | No stream chunking | Break long-lived streams on time or size boundaries using `break_session` |
@@ -526,4 +522,3 @@ The `HASH_TRUNCATE` setting exists **only** for debugging readability. In produc
 | Single-writer assumption per session | Enforce via distributed locking or partition assignment |
 | Tombstones do not propagate to parent streams | Add a `child_deleted` event type to parent streams |
 | No integration tests or property-based tests | Hypothesis-based chain-integrity tests, crash-recovery tests |
-
