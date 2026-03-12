@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
+const basePath = "/_next/wo_portfolio_diff/portfolio_diff";
+
 const nextConfig = {
-  basePath: "/_next/wo_portfolio_diff/portfolio_diff",
+  basePath,
+  env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

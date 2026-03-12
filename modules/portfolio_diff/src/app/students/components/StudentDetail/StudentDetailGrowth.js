@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/components/components.jsx";
 import { MetricsPanel } from "@/app/components/MetricsPanel";
 import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
-import { getWsOriginFromWindow } from "@/app/utils/ws";
+import { getConfiguredWsOrigin } from "@/app/utils/ws";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
 
@@ -271,10 +271,7 @@ export default function StudentDetailGrowth({
 
   const enabled = !!studentID && docIdsAsc.length > 0 && selectedMetrics.length > 0;
 
-  const origin =
-    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
-    getWsOriginFromWindow() ||
-    "ws://localhost:8888";
+  const origin = getConfiguredWsOrigin();
 
   const dataScope = useMemo(() => {
     if (!enabled) {

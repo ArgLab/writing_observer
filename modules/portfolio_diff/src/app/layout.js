@@ -1,5 +1,6 @@
 import Navbar from "./components/Navbar";
 import { CourseIdProvider } from "@/app/providers/CourseIdProvider";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata = {
@@ -11,6 +12,12 @@ export default function RootLayout({ children }) {
   return (
     <CourseIdProvider>
       <html lang="en">
+        <head>
+          <Script
+            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/runtime-config.js`}
+            strategy="beforeInteractive"
+          />
+        </head>
         <body className="antialiased">
           <Navbar />
           {children}

@@ -32,7 +32,7 @@ import dynamic from "next/dynamic";
 
 import { MetricsPanel } from "@/app/components/MetricsPanel";
 import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
-import { getWsOriginFromWindow } from "@/app/utils/ws";
+import { getConfiguredWsOrigin } from "@/app/utils/ws";
 
 /* ---------------------- deterministic helpers ---------------------- */
 const seedFrom = (s) => {
@@ -1110,10 +1110,7 @@ export default function EssayComparison() {
   ]);
 
   /* ---------------------- comparison data fetch ---------------------- */
-  const origin =
-    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
-    getWsOriginFromWindow() ||
-    "ws://localhost:8888";
+  const origin = getConfiguredWsOrigin();
 
   const dataScope = useMemo(() => {
     if (!urlReady || !studentID) {
