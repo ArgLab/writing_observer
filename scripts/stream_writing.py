@@ -31,12 +31,12 @@ import aiohttp
 import asyncio
 import docopt
 import json
-import loremipsum
 import names
 import random
 import sys
 import time
 
+from learning_observer.lorem import get_paragraphs
 
 ARGS = docopt.docopt(__doc__)
 print(ARGS)
@@ -97,7 +97,7 @@ def argument_list(argument, default):
 # TODO what is `source_files` supposed to be?
 # when running this script for the workshop, we should either
 #  1) move gpt3 texts out of writing observer (dependency hell) OR
-#  2) avoid using `--gpt3` parameter and use loremipsum instead
+#  2) avoid using `--gpt3` parameter and use local lorem generator instead
 source_files = None
 
 if ARGS["--gpt3"] is not None:
@@ -105,7 +105,8 @@ if ARGS["--gpt3"] is not None:
     TEXT = writing_observer.sample_essays.GPT3_TEXTS[ARGS["--gpt3"]]
     STREAMS = len(TEXT)
 elif source_files is None:
-    TEXT = ["\n".join(loremipsum.get_paragraphs(int(ARGS.get("--text-length", 5)))) for i in range(STREAMS)]
+    TEXT = ["\n".join(get_paragraphs(int(ARGS.get("--text-length", 5)))) for i in range(STREAMS)]
+    print(TEXT)
 else:
     TEXT = [open(filename).read() for filename in source_files]
 

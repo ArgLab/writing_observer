@@ -14,11 +14,11 @@ APIs so the code can be abstracted to the parent class.
 import aiohttp
 import asyncio
 import json
-import loremipsum
 import os
 import random
 
 from learning_observer.log_event import debug_log
+from learning_observer.lorem import get_paragraphs
 import learning_observer.prestartup
 import learning_observer.settings
 
@@ -151,7 +151,7 @@ class StubGPT(GPTAPI):
     async def chat_completion(self, prompt, system_prompt):
         async with LLM_SEMAPHOR['stub']:
             await asyncio.sleep(random.randint(5, 15))
-            return "\n".join(loremipsum.get_paragraphs(1))
+            return "\n".join(get_paragraphs(1))
 
 
 GPT_RESPONDERS = {

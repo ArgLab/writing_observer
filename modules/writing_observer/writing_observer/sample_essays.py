@@ -8,8 +8,9 @@ import os
 import os.path
 import random
 
-import loremipsum
 import wikipedia
+
+from learning_observer.lorem import get_paragraphs
 
 
 TextTypes = Enum('TextTypes', [
@@ -105,7 +106,7 @@ def lorem(paragraphs=5):
     '''
     Generate lorem ipsum test text.
     '''
-    return "\n\n".join(loremipsum.get_paragraphs(paragraphs))
+    return "\n\n".join(get_paragraphs(paragraphs))
 
 
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "data")
