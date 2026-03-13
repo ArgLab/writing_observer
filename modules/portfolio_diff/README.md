@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# portfolio_diff frontend
 
-## Getting Started
+This directory contains the Next.js frontend for portfolio diff visualizations. The app is configured with `output: "export"`, so a production build generates static files in `out/` that can be copied into Python modules or archived for an external assets repository.
 
-First, run the development server:
+## Prerequisites
+
+- Node.js + npm available locally.
+- Install dependencies from this directory:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Build the static site
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+From `modules/portfolio_diff`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+rm -rf out/
+npm run build
+```
 
-## Learn More
+After build completion, the static export is written to `out/`.
 
-To learn more about Next.js, take a look at the following resources:
+## Bundle build output into a `.tar.gz`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+If you need an artifact for an assets repository, archive the exported files from `out/`:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+VERSION_TAG=$(date +%Y%m%d-%H%M%S)
+tar -C out -czf "portfolio_diff_${VERSION_TAG}.tar.gz" .
+```
 
-## Deploy on Vercel
+That creates a tarball in `modules/portfolio_diff` (for example `portfolio_diff-20260710-153010.tar.gz`) containing the static site root.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+You should include copy this to the [`lo_assets` repository](github.com/ETS-Next-Gen/lo_assets) and update the `portfolio_diff-current.tar.gz` link to point to the new version.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Existing helper script
+
+This repo also includes `build_and_add_to_module.sh`, which builds and copies `out/` into `../wo_portfolio_diff/wo_portfolio_diff/portfolio_diff/` for local module packaging:
+
+```bash
+./build_and_add_to_module.sh
+```
+
+Use that helper when updating the in-repo Python package. Use the tarball workflow above when publishing to a separate assets repository.
