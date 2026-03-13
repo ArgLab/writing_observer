@@ -1,9 +1,5 @@
 '''
-Note that current loremipsum in `pip` is not Python 3
-compatible. If you are getting b'' in your text, the
-patch is at:
-
-`https://github.com/monkeython/loremipsum/issues/10`
+Synthetic student payload helpers used for mock-up UX data.
 '''
 
 import random
@@ -11,10 +7,10 @@ import random
 import numpy
 import numpy.random
 
-import loremipsum
 import names
 
 import learning_observer.util as util
+from learning_observer.lorem import get_paragraphs
 
 
 def synthetic_student_data(student_id):
@@ -22,7 +18,7 @@ def synthetic_student_data(student_id):
     Create fake student data for mock-up UX for one student
     '''
     name = names.get_first_name()
-    essay = "\n".join(loremipsum.get_paragraphs(5))
+    essay = "\n".join(get_paragraphs(5))
     return {
         'id': student_id,
         'name': name,
