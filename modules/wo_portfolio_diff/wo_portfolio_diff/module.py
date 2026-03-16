@@ -85,7 +85,7 @@ def _prompt_to_write_runtime_config():
     return learning_observer.remote_assets.confirm(
         prompt=(
             'Would you like to write runtime-config.js '
-            'using current LO hostname/protocol settings? (y/n) '
+            f'using current LO hostname/protocol settings `{_ws_origin_from_settings()}`?  (y/n) '
         ),
         default_noninteractive=True,
     )

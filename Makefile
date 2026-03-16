@@ -46,8 +46,8 @@ install: install-pre-commit-hook
 	# recent version. We would like to directly fetch `lodrc-current`,
 	# however, the fetch only returns the name of the file it's
 	# linked to. We do an additional fetch for the linked file.
-	@LODRC_CURRENT=$$(curl -s https://raw.githubusercontent.com/ETS-Next-Gen/lo_assets/main/lo_dash_react_components/lo_dash_react_components-current.tar.gz); \
-	pip install https://raw.githubusercontent.com/ETS-Next-Gen/lo_assets/main/lo_dash_react_components/$${LODRC_CURRENT}
+	@LODRC_CURRENT=$$(curl -s https://raw.githubusercontent.com/ArgLab/lo_assets/main/lo_dash_react_components/lo_dash_react_components-current.tar.gz); \
+	pip install https://raw.githubusercontent.com/ArgLab/lo_assets/main/lo_dash_react_components/$${LODRC_CURRENT}
 
 install-dev:
 	# TODO create a dev requirements file

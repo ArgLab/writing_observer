@@ -27,7 +27,7 @@ import urllib.request
 # Default repository coordinates
 # ---------------------------------------------------------------------------
 
-_LO_ASSETS_REPO = 'ETS-Next-Gen/lo_assets'
+_LO_ASSETS_REPO = 'ArgLab/lo_assets'
 _LO_ASSETS_REF = 'main'
 
 

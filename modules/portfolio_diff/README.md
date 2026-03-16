@@ -33,7 +33,7 @@ tar -C out -czf "portfolio_diff_${VERSION_TAG}.tar.gz" .
 
 That creates a tarball in `modules/portfolio_diff` (for example `portfolio_diff-20260710-153010.tar.gz`) containing the static site root.
 
-You should include copy this to the [`lo_assets` repository](github.com/ETS-Next-Gen/lo_assets) and update the `portfolio_diff-current.tar.gz` link to point to the new version.
+You should include copy this to the [`lo_assets` repository](github.com/ArgLab/lo_assets) and update the `portfolio_diff-current.tar.gz` link to point to the new version.
 
 ## Existing helper script
 
