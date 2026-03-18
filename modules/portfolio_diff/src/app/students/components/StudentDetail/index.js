@@ -9,7 +9,7 @@ import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/componen
 import StudentDetailCompare from "./StudentDetailCompare";
 import StudentDetailGrowth from "./StudentDetailGrowth";
 import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
-import { getWsOriginFromWindow } from "@/app/utils/ws";
+import { getConfiguredWsOrigin } from "@/app/utils/ws";
 
 /* =============================================================
    CONSTANTS
@@ -390,10 +390,7 @@ export default function StudentDetail({ studentId }) {
     },
   }), [courseId, studentID]);
 
-  const origin =
-    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
-    getWsOriginFromWindow() ||
-    "ws://localhost:8888";
+  const origin = getConfiguredWsOrigin();
 
   // Single hook for the entire page
   const { data, errors, connection } = useLOConnectionDataManager({

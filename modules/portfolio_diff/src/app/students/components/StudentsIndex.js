@@ -21,7 +21,7 @@ import {
   LO_CONNECTION_STATUS,
 } from "lo_event/lo_event/lo_assess/components/components.jsx";
 import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
-import { getWsOriginFromWindow } from "@/app/utils/ws";
+import { getConfiguredWsOrigin } from "@/app/utils/ws";
 
 
 const SEVEN_DAYS_SECS = 7 * 24 * 60 * 60;
@@ -115,10 +115,7 @@ export default function WritingPortfolioDashboard() {
     },
   };
 
-  const origin =
-      process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
-      getWsOriginFromWindow() ||
-      "ws://localhost:8888";
+  const origin = getConfiguredWsOrigin();
 
   const { data, errors, connection } = useLOConnectionDataManager({
     url: `${origin}/wsapi/communication_protocol`,

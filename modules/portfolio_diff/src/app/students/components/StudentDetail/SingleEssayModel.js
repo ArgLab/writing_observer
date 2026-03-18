@@ -17,7 +17,7 @@ import {
 import { MetricsPanel } from "@/app/components/MetricsPanel";
 import { useLOConnectionDataManager } from "lo_event/lo_event/lo_assess/components/components.jsx";
 import { useCourseIdContext } from "@/app/providers/CourseIdProvider";
-import { getWsOriginFromWindow } from "@/app/utils/ws";
+import { getConfiguredWsOrigin } from "@/app/utils/ws";
 
 /* =========================================================
    Helpers
@@ -678,10 +678,7 @@ function SingleEssayInnerModal({ studentKey, docId, docIds }) {
   }, [exportEnabled, courseId, docIds, selectedMetrics, studentKey]);
 
   // Connect to LO websocket
-  const origin =
-    process.env.NEXT_PUBLIC_LO_WS_ORIGIN?.replace(/\/+$/, "") ||
-    getWsOriginFromWindow() ||
-    "ws://localhost:8888";
+  const origin = getConfiguredWsOrigin();
 
   const url = `${origin}/wsapi/communication_protocol`;
   const { connection, data: loData, errors: loErrors } = useLOConnectionDataManager({ url, dataScope });

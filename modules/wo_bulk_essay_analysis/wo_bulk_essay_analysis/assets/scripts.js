@@ -32,7 +32,7 @@ function createBinnedPasteEventsBadge (document) {
   const mediumPastes = lengthBins.medium_21_200 ?? 0;
   const largePastes = lengthBins.long_201_plus ?? 0;
   const largeColor = largePastes > 0 ? 'warning' : 'secondary';
-  const mediumColor = mediumPastes > 0 ? 'warning' : 'seconday';
+  const mediumColor = mediumPastes > 0 ? 'warning' : 'secondary';
 
   return createDashComponent(
     DASH_HTML_COMPONENTS,
@@ -40,7 +40,7 @@ function createBinnedPasteEventsBadge (document) {
     {
       children: [
         createPasteBadge(`${smallPastes} small (<20)`, 'secondary'),
-        createPasteBadge(`${mediumPastes} medium (21-200)`,mediumColor),
+        createPasteBadge(`${mediumPastes} medium (21-200)`, mediumColor),
         createPasteBadge(`${largePastes} large (201+)`, largeColor)
       ],
       className: 'd-inline'
@@ -54,7 +54,7 @@ function createPasteMetricComponent (document, metricId) {
 
   switch (metricId) {
     case 'paste_events':
-      return createPasteBadge(`${pasteCount} pastes`, pasteCount > 0 ? 'secondary' : 'light', 'me-1');
+      return createPasteBadge(`${pasteCount} pastes`, pasteCount > 0 ? 'warning' : 'secondary', 'me-1');
     case 'paste_bins':
       return createBinnedPasteEventsBadge(document);
     case 'total_paste_chars':
