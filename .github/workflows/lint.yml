@@ -1,0 +1,35 @@
+name: Lint
+
+on: [push]
+
+jobs:
+  lint-python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Make
+        run: sudo apt-get install make
+
+      - name: Lint files
+        run: make linting-python
+  lint-node:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install Make
+        run: sudo apt-get install make
+
+      - name: Lint files
+        run: make linting-node

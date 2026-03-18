@@ -1,0 +1,43 @@
+{
+  "name": "writing_observer",
+  "version": "1.0.0",
+  "description": "![Writing Observer Logo](learning_observer/learning_observer/static/media/logo-clean.jpg)",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "lint:css": "stylelint '**/*.{css,scss}'",
+    "lint:js": "eslint '**/*.js'",
+    "lint": "npm run lint:css && npm run lint:js",
+    "find-unused-css": "node list-unused-css.js",
+    "build:docs": "npm run clean:docs && cd autodocs && make html",
+    "clean:docs": "rm -rf autodocs/_build && rm -rf autodocs/generated"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArgLab/writing_observer.git"
+  },
+  "author": "",
+  "license": "SEE LICENSE IN LICENSE.TXT",
+  "bugs": {
+    "url": "https://github.com/ArgLab/writing_observer/issues"
+  },
+  "homepage": "https://github.com/ArgLab/writing_observer#readme",
+  "devDependencies": {
+    "@actions/core": "^1.10.0",
+    "eslint": "^8.38.0",
+    "eslint-config-standard": "^17.0.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.1.1",
+    "eslint-plugin-standard": "^5.0.0",
+    "postcss": "^8.4.23",
+    "postcss-scss": "^4.0.6",
+    "stylelint": "^15.5.0",
+    "stylelint-config-standard": "^33.0.0",
+    "stylelint-scss": "^4.6.0"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.1.0"
+  }
+}

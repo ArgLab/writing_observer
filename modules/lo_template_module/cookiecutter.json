@@ -1,0 +1,7 @@
+{
+    "project_name": "Learning Observer Template",
+    "project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '_') }}",
+    "project_hyphenated": "{{ cookiecutter.project_slug.replace('_', '-') }}",
+    "project_short_description": "My Learning Observer Module.",
+    "reducer": "student_event_counter"
+}

@@ -1,0 +1,22 @@
+{
+  "name": "writing_observer_util",
+  "version": "1.0.0",
+  "description": "Utilities for the Learning Observer and Writing Observer",
+  "main": "generic_websocket_dashboard.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArgLab/writing_observer.git"
+  },
+  "author": "Piotr Mitros",
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/ArgLab/writing_observer/issues"
+  },
+  "homepage": "https://github.com/ArgLab/writing_observer#readme",
+  "dependencies": {
+    "ws": "^8.17.1"
+  }
+}

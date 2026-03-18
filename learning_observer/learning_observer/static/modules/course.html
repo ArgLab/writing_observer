@@ -1,0 +1,68 @@
+<div class="card">
+  <div class="card-header">
+    <div class="card-header-title is-centered">
+      {{ name }}
+    </div>
+  </div>
+  <div class="card-content">
+    <div class="content ">
+      {{{ tools }}}
+      <p>
+        {{ description_heading }}</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <div class="card-footer-item">
+      <p>
+      <nav class="breadcrumb is-centered">
+        <ul>
+          {{#alternate_link}}
+          <li>
+            <a href="{{alternate_link}}">
+              <span class="icon"><i class="fab fa-google"></i></span>
+              Google Classroom
+            </a>
+          </li>
+          {{/alternate_link}}
+
+          {{#calendar_id}}
+          <li>
+            <a href="https://calendar.google.com/calendar/embed?src={{calendar_id}}">
+              <span class="icon"><i class="far fa-calendar-alt"></i></span>
+              Calendar
+            </a>
+          </li>
+          {{/calendar_id}}
+
+          {{#teacher_folder.alternate_link}}
+          <li>
+            <a href="{{teacher_folder.alternate_link}}">
+              <span class="icon"><i class="fab fa-google-drive"></i></span>
+              Teacher folder
+            </a>
+          </li>
+          {{/teacher_folder.alternate_link}}
+
+          {{#course_group_email}}
+          <li>
+            <a href="mailto:{{course_group_email}}">
+              <span class="icon"><i class="fas fa-mail-bulk"></i></span>
+              Email class
+            </a>
+          </li>
+          {{/course_group_email}}
+
+          {{#teacher_group_email}}
+          <li>
+            <a href="mailto:{{teacher_group_email}}">
+              <span class="icon"><i class="fas fa-envelope-open-text"></i></span>
+              Email course staff
+            </a>
+          </li>
+          {{/teacher_group_email}}
+        </ul>
+      </nav>
+      </p>
+    </div>
+  </div>
+</div>

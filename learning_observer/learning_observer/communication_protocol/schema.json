@@ -1,0 +1,28 @@
+{
+    "definitions": {
+        "generic_dispatch": {
+            "$comment": "TODO create definition for each type of dispatch",
+            "type": "object",
+            "properties": {
+                "dispatch": {"type": "string"}
+            },
+            "additionalProperties": true,
+            "required": ["dispatch"]
+        }
+    },
+    "type": "object",
+    "properties": {
+        "execution_dag": {
+            "type": "object",
+            "patternProperties": {
+                ".*": {
+                    "oneOf": [
+                        {"$ref": "#/definitions/generic_dispatch"}
+                    ]
+                }
+            }
+        },
+        "exports": {"type": "object"}
+    },
+    "required": ["execution_dag", "exports"]
+}

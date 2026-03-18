@@ -1,0 +1,67 @@
+These images are from HubSpot's free Make My Persona tool.
+
+https://www.hubspot.com/make-my-persona?utm_source=mktg-resources
+
+These have unclear licensing. HubSpot has "Copright (c) 2020 HubSpot
+Inc." at the bottom of the page, but no other text there (not even All
+Rights Reserved). There is no license file anywhere we could
+find. There were many implicit grants in other places e.g. "Create a
+buyer persona that your entire company can use to market, sell, and
+serve better" which made this use seem okay, so we reached out to
+HubSpot to confirm this use was okay.
+
+HubSpot explicitly confirmed that we were in the clear for UX
+prototypes, mockups, and personas. Chat transcript below.
+
+However, these are NOT distributed under the same license as the rest
+of the project. For licensing information, please contact HubSpot
+directly.
+
+My expectation (as of this writing) is that we will NOT use these
+avatars beyond mockups, prototypes, and testing. If we go beyond that,
+we may revisit.
+
+The rest of the mockup personas incorporated information from several
+such tools. The rest were clearly okay.
+
+Thank you HubSpot!
+
+
+
+Chat with Hubspot support on 5/19/2020 at 3:47pm EST:
+
+HubBot:
+  Great, a coach is on their way now. They’ll send a message
+  when they get here, so I appreciate your patience in the meantime.
+
+3:40 PM Ali:
+  Hi Peter, this is Ali from HubSpot Sales. I'm happy to point you in the right direction today. 
+
+3:40 PM
+  I just had a quick question: you have a bunch of free tools, like a
+  person generator. If we use them, are we allowed to use the personas
+  however we like? Or are there licensing restrictions?
+
+  They say nothing, and if it's All Rights Reserved, we're not allowed
+  to use them for anything. Which sort of makes them pointless. Or I'm
+  not sure. https://www.hubspot.com/make-my-persona It's a nice tool,
+  but there's no legal information
+
+
+3:42 PM Ali
+  You would be creating your buyer persona for your own company, no one
+  else would see it if you use the generator to create a buyer persona
+  then there aren't legal restrictions
+
+
+3:43 PM
+  Okay. Thank you. I'm building an open source educational tool, and I
+  wanted to share some UX mock-ups and prototypes, including user
+  personas from the tool (obviously not open-sourcing the personas
+  themselves). It sounds like that's okay then?
+
+3:45 PM Ali
+  Yes that is definitely okay Peter 
+
+3:47 PM
+  Thank you so much!
