@@ -22,6 +22,7 @@ The workflow is split across 2 functions
 import aiohttp
 import aiohttp_session
 import jwt
+import os
 import pmss
 import re
 import time
@@ -31,6 +32,7 @@ from urllib.parse import urlencode
 
 import learning_observer.auth.utils
 import learning_observer.constants as constants
+import learning_observer.prestartup
 import learning_observer.settings
 
 from learning_observer.log_event import debug_log
@@ -76,6 +78,53 @@ pmss.register_field(
     description='Path to where private key is stored',
     required=True
 )
+
+
+@learning_observer.prestartup.register_startup_check
+def validate_lti_provider_keys():
+    '''
+    Ensure every configured LTI provider has a readable private signing key.
+    '''
+    auth_settings = learning_observer.settings.settings.get('auth', {})
+    lti_providers = auth_settings.get('lti', {})
+    if not isinstance(lti_providers, dict):
+        return
+
+    missing_provider_keys = []
+    for provider, provider_settings in lti_providers.items():
+        if not isinstance(provider_settings, dict):
+            missing_provider_keys.append((provider, 'missing provider settings'))
+            continue
+
+        private_key_path = provider_settings.get('private_key_path')
+        if not private_key_path:
+            missing_provider_keys.append((provider, 'missing private_key_path'))
+            continue
+        if not os.path.exists(private_key_path):
+            missing_provider_keys.append((provider, f'file not found: {private_key_path}'))
+            continue
+        if not os.path.isfile(private_key_path):
+            missing_provider_keys.append((provider, f'not a file: {private_key_path}'))
+            continue
+
+    if missing_provider_keys:
+        provider_error_list = "\n".join([
+            f"  - {provider}: {error}"
+            for provider, error in missing_provider_keys
+        ])
+        raise learning_observer.prestartup.StartupCheck(
+            "LTI setup is incomplete for one or more providers.\n"
+            "The following providers are missing a valid signing key path:\n"
+            f"{provider_error_list}\n\n"
+            "Create an LTI signing keypair and update auth.lti.<provider>.private_key_path.\n"
+            "Commands:\n"
+            "  mkdir -p secrets\n"
+            "  openssl genrsa -out secrets/lti-tool-private.pem 4096\n"
+            "  openssl rsa -in secrets/lti-tool-private.pem -pubout > secrets/lti-tool-public.pem\n"
+            "  # Optional (if your LMS setup asks for JWKS format):\n"
+            "  python scripts/generate_jwks.py secrets/lti-tool-public.pem\n\n"
+            "Share the generated public key with whoever is installing the dashboards in the LMS."
+        )
 
 
 # TODO this code is copied from lo/lo/integrations/canvas.py
