@@ -71,9 +71,9 @@ def _build_rulesets(ruleset_paths):
     rulesets = []
     for ruleset_path in _expand_ruleset_paths(ruleset_paths):
         if ruleset_path.endswith(('.yaml', '.yml')):
-            rulesets.append(pmss.YAMLFileRuleset(filename=ruleset_path))
+            rulesets.append(pmss.YAMLFileRuleset(filename=ruleset_path, watch=True))
         elif ruleset_path.endswith('.pmss'):
-            rulesets.append(pmss.PMSSFileRuleset(filename=ruleset_path))
+            rulesets.append(pmss.PMSSFileRuleset(filename=ruleset_path, watch=True))
         else:
             print(
                 f"Skipping PMSS ruleset file {ruleset_path}; "
