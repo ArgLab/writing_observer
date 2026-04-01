@@ -1,0 +1,110 @@
+[
+  {
+    "id": 27,
+    "label": "assessment",
+    "name": "Assessment",
+    "description": "Profile for capturing items related to assessments of employees, students, players, etc.",
+    "isPublic": true,
+    "createdAt": "2014-06-10T19:13:02.000Z",
+    "updatedAt": "2015-11-03T14:02:23.000Z"
+  },
+  {
+    "id": 48,
+    "label": "attendance",
+    "name": "Attendance",
+    "description": "Profile for tracking attendance at events.",
+    "isPublic": true,
+    "createdAt": "2015-04-28T17:46:38.000Z",
+    "updatedAt": "2015-05-07T17:35:29.000Z"
+  },
+  {
+    "id": 23,
+    "label": "bookmarklet",
+    "name": "Bookmarklet",
+    "description": "Profile tracking items used by a bookmarklet application.",
+    "isPublic": true,
+    "createdAt": "2014-05-01T14:07:37.000Z",
+    "updatedAt": "2014-07-21T19:16:36.000Z"
+  },
+  {
+    "id": 20,
+    "label": "checklist",
+    "name": "Checklist",
+    "description": "Profile for capturing items related to checklists, such as performance observation, self assessed, etc.",
+    "isPublic": true,
+    "createdAt": "2014-03-12T17:33:47.000Z",
+    "updatedAt": "2014-06-13T12:31:16.000Z"
+  },
+  {
+    "id": 61,
+    "label": "ECE",
+    "name": "ECE",
+    "description": "The mission of this Early Childhood Education (ECE) xAPI Profile is to define a shared vocabulary that allow the recording of the most common events that take place on a daily basis in an ECE school. This profile adds specific information for the collection of relevant data by tools that allow the tracking and monitoring of the evolution of children from ages 0 to 6. In this context, educators and parents or legal guardian have clearly distinct roles. The educator acts fundamentally as the recorder of events that take place in the classroom while the parents or legal guardian act as the consumers of that information. \n\nIn a more specific manner, the main goal of the ECE-xAPI Profile is to make the following representation easier:\n\n - Care interactions (e.g. change a diaper)\n\n - Educational interactions (e.g. participating in an activity)\n\n - Assessment of the progress and achievements reached by the child\n\n - Multimedia documentation of observations\n\n - Exchange of messages between educators and families\n\n",
+    "isPublic": true,
+    "createdAt": "2016-04-26T12:20:51.000Z",
+    "updatedAt": "2016-05-20T12:20:07.000Z"
+  },
+  {
+    "id": 44,
+    "label": "openbadges",
+    "name": "Open Badges",
+    "description": "Tin Can statements realting to Open Badges",
+    "isPublic": true,
+    "createdAt": "2015-03-20T12:37:13.000Z",
+    "updatedAt": "2015-03-31T09:20:51.000Z"
+  },
+  {
+    "id": 40,
+    "label": "scorm-to-tin-can",
+    "name": "SCORM to Tin Can",
+    "description": "Profile for managing Activities and Recipes related to recording legacy SCORM and AICC courses in a Tin Can data format.",
+    "isPublic": true,
+    "createdAt": "2015-01-09T15:45:26.000Z",
+    "updatedAt": "2015-01-21T22:24:08.000Z"
+  },
+  {
+    "id": 60,
+    "label": "srl",
+    "name": "xAPI-SRL",
+    "description": "Profile for capturing key data about the implementation of Self-Regulated Learning (SRL) strategies by learners. This data can be used to facilitate self-monitoring and self-evaluation for learners, monitoring the learners\u2019 performance for teachers and to enable measuring learners\u2019 adoption of SRL strategies.\n\n\n",
+    "isPublic": true,
+    "createdAt": "2016-03-03T15:17:33.000Z",
+    "updatedAt": "2016-03-08T13:40:34.000Z"
+  },
+  {
+    "id": 22,
+    "label": "tags",
+    "name": "Tags",
+    "description": "An open profile where an activity can always be created because they are restricted to a single word with a single word name.\n\nA \"tag\" as a single word means that no matter what tag someone creates anyone can use that tag as well. Normally an Activity is only shared when it will have the same meaning to everyone, as a single word (English or not) a tag naturally has the same meaning.\n\nTo create an Activity under this profile simply use the format: `http://id.tincanapi.com/activity/tags/<your word>`. Then use the same word in the Activity Definition 'name' property with the 'und' (undefined) language map code for the language. The corresponding Activity looks like this:\n\n```json\n{\n    \"id\": \"http://id.tincanapi.com/activity/tags/<your word>\",\n    \"definition\": {\n        \"name\": {\n            \"und\": \"<your word>\"\n        }\n    },\n    \"objectType\": \"Activity\"\n}\n```",
+    "isPublic": true,
+    "createdAt": "2014-05-01T14:06:28.000Z",
+    "updatedAt": "2014-07-21T15:47:34.000Z"
+  },
+  {
+    "id": 17,
+    "label": "tincan-prototypes",
+    "name": "Tin Can Prototypes",
+    "description": "Profile to capture the various activities, verbs, etc. that are used in the Tin Can Prototypes. This profile serves the following purposes:\n\n* Serves as a sample profile for other profiles to follow.\n* Acts as a quick reference for the statement structure used by the prototypes without having to dissect the code.\n* Gives examples to follow for implementers with products in the areas covered by the prototypes until community led profiles for these use cases emerge. \n* Provides details for reporting tools looking to create reports for the prototypes and other similar implementations.",
+    "isPublic": true,
+    "createdAt": "2013-10-14T18:29:45.000Z",
+    "updatedAt": "2015-04-20T16:25:08.000Z"
+  },
+  {
+    "id": 19,
+    "label": "video",
+    "name": "Video",
+    "description": "Profile capturing items related to video experiences.",
+    "isPublic": true,
+    "createdAt": "2014-03-12T17:33:45.000Z",
+    "updatedAt": "2014-06-13T12:31:40.000Z"
+  },
+  {
+    "id": 50,
+    "label": "virtualpatient",
+    "name": "Medbiquitous Virtual Patient",
+    "description": "Working with Medbiq xAPI Interest Group and Medbiq Virtual Patient standard to create a Profile and Recipe to describe virtual patient activities",
+    "isPublic": true,
+    "createdAt": "2015-07-03T15:22:22.000Z",
+    "updatedAt": "2015-07-04T19:53:53.000Z"
+  }
+]

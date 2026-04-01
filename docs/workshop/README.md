@@ -1,0 +1,1 @@
+These files are instructions, not specific to Learning Observer, which were used when running workshops. It is not clear they belong in this repo long-term, but this seems an okay place for them for now.

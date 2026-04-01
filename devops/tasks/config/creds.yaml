@@ -1,0 +1,33 @@
+hostname: {{hostname}}.{{domain}}
+xmpp:
+  sink: # Receives messages. We'll need many of these.
+    jid: sink@localhost
+    password: {{RANDOM1}}
+  source: # Sends messages.
+    jid: source@localhost
+    password: {{RANDOM1}}
+  stream: # For debugging
+    jid: stream@localhost
+    password: {{RANDOM1}}
+auth:
+  password_file: passwd.lo
+pubsub:
+    type: redis
+kvs:
+    type: redis
+roster_data:
+    source: all
+aio:
+    session_secret: {{RANDOM2}}
+    session_max_age: 3600
+config:
+    run_mode: dev
+    debug: []
+theme:
+    server_name: Learning Observer
+    front_page_pitch: Learning Observer is an experimental dashboard. If you'd like to be part of the experiment, please contact us. If you're already part of the experiment, log in!
+    logo_big: /static/media/logo-clean.jpg
+event_auth:
+    local_storage:
+        userfile: students.yaml
+        allow_guest: true

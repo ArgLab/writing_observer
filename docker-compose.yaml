@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    volumes:
+      - ./:/app
+    image: learning-observer-image:latest
+    stdin_open: true  # Keep standard input open
+    tty: true         # Allocate a pseudo-TTY
+    restart: always
+    ports:
+      - 8888:8888
+    depends_on:
+      - redis
+  redis:
+    image: redis:latest

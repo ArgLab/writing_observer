@@ -1,0 +1,35 @@
+.pane-with-sidebar {
+  display: flex;
+  margin-top: 20px;
+}
+
+.main-pane {
+  flex-grow: 1;
+  padding: 15px;
+}
+
+.sidebar {
+  width: 300px;
+  background-color: #e9ecef;
+  padding: 15px;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-card {
+  padding: 10px;
+  background-color: #fff;
+  border: 1px solid #d1d1d1;
+  margin-bottom: 10px;
+}
+
+textarea.large-input {
+  width: 100%;
+  height: 150px;
+  margin-bottom: 10px;
+}
+
+textarea.compact-input {
+  width: 33%;
+  height: 75px;
+  margin-bottom: 10px;
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h1>HTML DOM Events</h1>
+
+<p>Demo page for HTML events.</p>
+
+<input id="myInput" type="text" value="Copy/paste test">
+
+<p id="demo"></p>
+
+<div id="output"></div>
+<script type="module">
+  import { subscribeToEvents } from '../lo_event/browser_events.js';
+  import * as lo_event from '../lo_event/lo_event.js';
+  import { consoleLogger } from '../lo_event/consoleLogger.js';
+  import { browserInfo } from '../lo_event/metadata/browserinfo.js';
+  import { chromeAuth } from  '../lo_event/metadata/chromeauth.js';
+  import { localStorageInfo, sessionStorageInfo } from  '../lo_event/metadata/storage.js';
+
+  lo_event.init (
+      "org.ets.browser-test",
+      "0.0.1",
+      [consoleLogger()],
+      {
+          metadata: [
+              browserInfo(),
+              chromeAuth(),
+              localStorageInfo(),
+              sessionStorageInfo()
+          ]
+      }
+  );
+  lo_event.go();
+
+  function logToDiv(eventType, event) {
+      // Select the output div
+      var outputDiv = document.getElementById("output");
+
+      // Append the text to the div
+      outputDiv.innerHTML += `<b>${eventType}</b>: ${JSON.stringify(event)}<br/>`;
+
+      console.log(`${eventType}: ${JSON.stringify(event)}`);
+  }
+
+  subscribeToEvents({dispatch: logToDiv});
+</script>
+
+</body>
+</html>

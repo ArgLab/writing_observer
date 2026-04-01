@@ -1,0 +1,5 @@
+sudo apt-get update
+sleep 1
+sudo apt-get -y upgrade
+sleep 1
+sudo apt-get -y dist-upgrade
