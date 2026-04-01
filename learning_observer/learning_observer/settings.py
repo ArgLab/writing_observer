@@ -71,15 +71,31 @@ def _build_rulesets(ruleset_paths):
     rulesets = []
     for ruleset_path in _expand_ruleset_paths(ruleset_paths):
         if ruleset_path.endswith(('.yaml', '.yml')):
-            rulesets.append(pmss.YAMLFileRuleset(filename=ruleset_path))
+            rulesets.append(
+                pmss.YAMLFileRuleset(
+                    filename=ruleset_path,
+                    watch=_should_watch_pmss_rulesets()
+                )
+            )
         elif ruleset_path.endswith('.pmss'):
-            rulesets.append(pmss.PMSSFileRuleset(filename=ruleset_path))
+            rulesets.append(
+                pmss.PMSSFileRuleset(
+                    filename=ruleset_path,
+                    watch=_should_watch_pmss_rulesets()
+                )
+            )
         else:
             print(
                 f"Skipping PMSS ruleset file {ruleset_path}; "
                 "unsupported suffix."
             )
     return rulesets
+
+
+def _should_watch_pmss_rulesets():
+    if args is not None and hasattr(args, 'pmss_watch_rulesets'):
+        return args.pmss_watch_rulesets
+    return True
 
 
 def init_pmss_settings(ruleset_paths=None):
@@ -115,6 +131,11 @@ def parse_and_validate_arguments():
         help='List of PMSS ruleset files or a directory of rulesets.',
         nargs='+',
         default=[learning_observer.paths.config_file()])
+    
+    parser.add_argument(
+        '--pmss-watch-rulesets',
+        help='Watch PMSS rulesets for changes and auto-reload them.',
+        default=True, nargs='?', const=True, type=str_to_bool)
 
     parser.add_argument(
         '--watchdog',
