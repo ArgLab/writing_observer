@@ -1197,10 +1197,24 @@ export default function EssayComparison() {
   const isDocsLoading = enabled && !docsReady;
   // -------------------------------------------------------------------
 
+  const leftDocLoading = enabled && !leftTextNonEmpty;
+  const rightDocLoading = enabled && !rightTextNonEmpty;
+
   const leftText = leftHasTextField ? leftDoc?.text || "" : "";
   const rightText = rightHasTextField ? rightDoc?.text || "" : "";
 
   const showInlineWarning = enabled && isDocsLoading && !!loErrors;
+
+  const hasPendingMetricData = useMemo(() => {
+    if (!enabled || !leftTextNonEmpty || !rightTextNonEmpty) return false;
+    return selectedMetrics.some((metricId) => {
+      const leftMetric = leftDoc?.[metricId];
+      const rightMetric = rightDoc?.[metricId];
+      return !leftMetric || !rightMetric;
+    });
+  }, [enabled, leftTextNonEmpty, rightTextNonEmpty, selectedMetrics, leftDoc, rightDoc]);
+
+  const showLoadingIndicator = isDocsLoading || hasPendingMetricData;
 
   const [leftEssay, setLeftEssay] = useState(() => buildEssayFromDoc({ docId: leftDocId, text: "", side: "left" }));
   const [rightEssay, setRightEssay] = useState(() => buildEssayFromDoc({ docId: rightDocId, text: "", side: "right" }));
@@ -1208,14 +1222,12 @@ export default function EssayComparison() {
   useEffect(() => {
     setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: "", side: "left", title: docTitle(leftDocId) }));
     setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: "", side: "right", title: docTitle(rightDocId) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leftDocId, rightDocId, docTitle]);
 
   useEffect(() => {
     if (!enabled) return;
     if (leftHasTextField) setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: leftText, side: "left", title: docTitle(leftDocId) }));
     if (rightHasTextField) setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: rightText, side: "right", title: docTitle(rightDocId) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, leftHasTextField, rightHasTextField, leftDocId, rightDocId, leftText, rightText, docTitle]);
 
   /* ---------------------- CUSTOM TOOLTIP STATE ---------------------- */
@@ -1669,18 +1681,21 @@ export default function EssayComparison() {
       </div>
 
       <div className="px-6 pb-6">
-        {isDocsLoading ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <div className="text-sm text-gray-700 font-medium">Loading documents…</div>
+        {showLoadingIndicator ? (
+          <div className="mb-4 bg-white rounded-xl border border-emerald-200 shadow-sm px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-emerald-800">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span className="font-medium">
+                {isDocsLoading ? "Loading document data…" : "Refreshing selected metrics…"}
+              </span>
             </div>
-            <div className="mt-2 text-xs text-gray-500">
-              Waiting until both documents return non-empty <span className="font-mono">text</span>.
+            <div className="mt-1 text-xs text-emerald-700/90">
+              Keeping the current comparison visible while new data arrives.
             </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        ) : null}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* ✅ Sidebar replaced with MetricsPanel */}
             <div className="hidden lg:block lg:col-span-3">
               <MetricsPanel metrics={selectedMetrics} setMetrics={setSelectedMetrics} title="Metrics" stickyTopClassName="top-24" />
@@ -1757,18 +1772,30 @@ export default function EssayComparison() {
                   </div>
 
                   <div className="p-6 py-2 bg-white h-[16rem] overflow-y-auto">
-                    <div className="text-xs text-gray-500 mb-3">
-                      Hover highlights to see metric tooltip.
-                      {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
-                    </div>
-                    <HighlightedEssay
-                      doc={leftDoc}
-                      activeMetricIds={activeMetricIds}
-                      containerRef={leftEssayRef}
-                      onShowTooltip={onShowTooltip}
-                      onMoveTooltip={onMoveTooltip}
-                      onHideTooltip={onHideTooltip}
-                    />
+                    {leftDocLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <RefreshCw className="h-5 w-5 animate-spin text-emerald-600 mx-auto" />
+                          <div className="mt-2 text-sm text-gray-700 font-medium">Loading selected document…</div>
+                          <div className="mt-1 text-xs text-gray-500">Other sections stay available while this side updates.</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-xs text-gray-500 mb-3">
+                          Hover highlights to see metric tooltip.
+                          {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
+                        </div>
+                        <HighlightedEssay
+                          doc={leftDoc}
+                          activeMetricIds={activeMetricIds}
+                          containerRef={leftEssayRef}
+                          onShowTooltip={onShowTooltip}
+                          onMoveTooltip={onMoveTooltip}
+                          onHideTooltip={onHideTooltip}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1813,18 +1840,30 @@ export default function EssayComparison() {
                   </div>
 
                   <div className="p-6 py-2 bg-white h-[16rem] overflow-y-auto">
-                    <div className="text-xs text-gray-500 mb-3">
-                      Hover highlights to see metric tooltip.
-                      {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
-                    </div>
-                    <HighlightedEssay
-                      doc={rightDoc}
-                      activeMetricIds={activeMetricIds}
-                      containerRef={rightEssayRef}
-                      onShowTooltip={onShowTooltip}
-                      onMoveTooltip={onMoveTooltip}
-                      onHideTooltip={onHideTooltip}
-                    />
+                    {rightDocLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <RefreshCw className="h-5 w-5 animate-spin text-emerald-600 mx-auto" />
+                          <div className="mt-2 text-sm text-gray-700 font-medium">Loading selected document…</div>
+                          <div className="mt-1 text-xs text-gray-500">Other sections stay available while this side updates.</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-xs text-gray-500 mb-3">
+                          Hover highlights to see metric tooltip.
+                          {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
+                        </div>
+                        <HighlightedEssay
+                          doc={rightDoc}
+                          activeMetricIds={activeMetricIds}
+                          containerRef={rightEssayRef}
+                          onShowTooltip={onShowTooltip}
+                          onMoveTooltip={onMoveTooltip}
+                          onHideTooltip={onHideTooltip}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1955,7 +1994,6 @@ export default function EssayComparison() {
               )}
             </section>
           </div>
-        )}
       </div>
     </div>
   );
