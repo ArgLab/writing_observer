@@ -1096,7 +1096,8 @@ export default function EssayComparison() {
   const leftDocId = docIds[0] || "";
   const rightDocId = docIds[1] || "";
 
-  const enabled = urlReady && !!studentID && docIds.length === 2;
+  const hasCourseId = courseId !== undefined && courseId !== null && String(courseId).trim().length > 0;
+  const enabled = urlReady && hasCourseId && !!studentID && docIds.length === 2;
   const missingParams = urlReady && (!studentID || docIds.length !== 2);
 
   const [selectedMetrics, setSelectedMetrics] = useState([
@@ -1113,7 +1114,7 @@ export default function EssayComparison() {
   const origin = getConfiguredWsOrigin();
 
   const dataScope = useMemo(() => {
-    if (!urlReady || !studentID) {
+    if (!urlReady || !studentID || !hasCourseId) {
       return {
         wo: {
           execution_dag: "writing_observer",
@@ -1146,7 +1147,7 @@ export default function EssayComparison() {
         },
       },
     };
-  }, [urlReady, studentID, courseId, docIds, selectedMetrics]);
+  }, [urlReady, studentID, hasCourseId, courseId, docIds, selectedMetrics]);
 
   const { data: loData, errors: loErrors, connection: loConnection } = useLOConnectionDataManager({
     url: `${origin}/wsapi/communication_protocol`,
@@ -1203,7 +1204,18 @@ export default function EssayComparison() {
   const leftText = leftHasTextField ? leftDoc?.text || "" : "";
   const rightText = rightHasTextField ? rightDoc?.text || "" : "";
 
-  const showInlineWarning = enabled && isDocsLoading && !!loErrors;
+  const hasLoadErrors = useMemo(() => {
+    if (!enabled || !loErrors) return false;
+    if (Array.isArray(loErrors)) return loErrors.length > 0;
+    if (typeof loErrors === "object") return Object.keys(loErrors).length > 0;
+    return true;
+  }, [enabled, loErrors]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" && hasLoadErrors) {
+      console.warn("[students/compare] Non-blocking LO warnings detected:", loErrors);
+    }
+  }, [hasLoadErrors, loErrors]);
 
   const hasPendingMetricData = useMemo(() => {
     if (!enabled || !leftTextNonEmpty || !rightTextNonEmpty) return false;
@@ -1723,11 +1735,6 @@ export default function EssayComparison() {
                 </button>
               </div>
 
-              {showInlineWarning ? (
-                <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  Some data errors were reported while loading documents.
-                </div>
-              ) : null}
 
               {/* Essays */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
