@@ -1311,6 +1311,15 @@ export default function EssayComparison() {
     [updateUrlIds]
   );
 
+  const swapDocSides = useCallback(() => {
+    setDocIds((prev) => {
+      if (!Array.isArray(prev) || prev.length < 2) return prev;
+      const next = [prev[1] || "", prev[0] || ""];
+      updateUrlIds(next);
+      return next;
+    });
+  }, [updateUrlIds]);
+
   /* ---------------------- Replace Modal (no shifting, full doc list) ---------------------- */
   const [replaceModal, setReplaceModal] = useState({ open: false, side: "left" });
   const [replaceQuery, setReplaceQuery] = useState("");
@@ -1678,10 +1687,20 @@ export default function EssayComparison() {
             </div>
 
             <section className="lg:col-span-9">
-              <div className="mb-4 lg:hidden">
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={swapDocSides}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700"
+                  type="button"
+                  title="Swap which document is shown on the left and right"
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Swap documents
+                </button>
+
                 <button
                   onClick={openMetricsModal}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700 lg:hidden"
                   type="button"
                 >
                   <ListCollapse className="h-4 w-4" />
