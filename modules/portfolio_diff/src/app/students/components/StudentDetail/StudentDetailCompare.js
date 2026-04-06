@@ -189,6 +189,8 @@ export default function StudentDetailCompare({
     }, {});
   }, [filteredDocs]);
 
+  const hasFilteredDocs = filteredDocs.length > 0;
+
   const SkeletonCard = ({ i }) => (
     <div key={i} className="bg-white rounded-2xl border border-gray-200 shadow-sm">
       <div className="p-6 h-84 flex flex-col animate-pulse">
@@ -229,6 +231,157 @@ export default function StudentDetailCompare({
         </div>
       ) : (
         <>
+          <div className="mb-6 py-3 px-3 bg-white border border-gray-200 rounded-xl">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative" ref={tagRef}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (typeof setTagOpen === "function") setTagOpen((v) => !v);
+                  }}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                >
+                  Tags{" "}
+                  {Array.isArray(filterTags) && filterTags.length > 0 && (
+                    <span className="text-gray-500">({filterTags.length})</span>
+                  )}
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                </button>
+
+                {tagOpen && (
+                  <div className="absolute z-20 mt-2 w-64 rounded-md border border-gray-200 bg-white shadow-lg p-2">
+                    <div className="flex items-center gap-2 px-2 py-1 mb-2 rounded bg-gray-50">
+                      <Search className="h-4 w-4 text-gray-400" />
+                      <input
+                        placeholder="Search tags…"
+                        value={tagQuery || ""}
+                        onChange={(e) => typeof setTagQuery === "function" && setTagQuery(e.target.value)}
+                        className="w-full bg-transparent text-sm outline-none"
+                      />
+                    </div>
+                    <div className="max-h-56 overflow-auto pr-1">
+                      {safeBaseTags
+                        .filter((t) => String(t).toLowerCase().includes(String(tagQuery || "").toLowerCase()))
+                        .map((t) => (
+                          <label
+                            key={t}
+                            className="flex items-center gap-2 px-2 py-1 text-sm hover:bg-gray-50 rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Array.isArray(filterTags) ? filterTags.includes(t) : false}
+                              onChange={() => {
+                                if (typeof setFilterTags !== "function") return;
+                                setFilterTags((prev) => {
+                                  const p = Array.isArray(prev) ? prev : [];
+                                  return p.includes(t) ? p.filter((x) => x !== t) : [...p, t];
+                                });
+                              }}
+                              className="accent-emerald-600"
+                            />
+                            {t}
+                          </label>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  value={search || ""}
+                  onChange={(e) => typeof setSearch === "function" && setSearch(e.target.value)}
+                  placeholder="Search title, tags, text…"
+                  className="pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm bg-white w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex-1" />
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Sort by:</span>
+                <select
+                  value={sortBy || "date"}
+                  onChange={(e) => typeof setSortBy === "function" && setSortBy(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="date">Date</option>
+                  <option value="grade">Grade</option>
+                  <option value="words">Word Count</option>
+                  <option value="title">Title</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Cards per row</span>
+                <select
+                  value={cardsPerRow ?? 3}
+                  onChange={(e) =>
+                    typeof setCardsPerRow === "function" && setCardsPerRow(Number(e.target.value))
+                  }
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {isAnyFilter && (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {(Array.isArray(filterTags) ? filterTags : []).map((t) => (
+                  <span
+                    key={`tag-${t}`}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full"
+                  >
+                    Tag: {t}
+                    <button
+                      className="ml-1 rounded hover:bg-gray-200 p-0.5"
+                      onClick={() => {
+                        if (typeof setFilterTags !== "function") return;
+                        setFilterTags((prev) => (Array.isArray(prev) ? prev.filter((x) => x !== t) : []));
+                      }}
+                      aria-label={`Remove ${t}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+
+                {String(search || "").trim().length > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
+                    Search: “{search}”
+                    <button
+                      className="ml-1 rounded hover:bg-gray-200 p-0.5"
+                      onClick={() => typeof setSearch === "function" && setSearch("")}
+                      aria-label="Clear search"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+
+                <button
+                  onClick={() => typeof clearFilters === "function" && clearFilters()}
+                  className="ml-1 text-xs text-gray-600 underline underline-offset-2 hover:text-gray-800"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!hasFilteredDocs && (
+            <div className="mt-6 p-6 bg-white border border-gray-200 rounded-2xl">
+              <div className="text-gray-900 font-semibold">No matching documents</div>
+              <div className="text-sm text-gray-600 mt-1">Try adjusting your search or removing filters.</div>
+            </div>
+          )}
+
           {Object.entries(groupedDocs).map(([category, list], index) => {
             const wordsAvg = Math.round(
               list.reduce((s, e) => s + (Number(e.words) || 0), 0) / Math.max(1, list.length)
@@ -245,152 +398,6 @@ export default function StudentDetailCompare({
                       {list.length} essays • Avg {wordsAvg.toLocaleString()} words
                     </div>
                   </div>
-
-                  {index === 0 && (
-                    <div className="mt-3 py-3 px-3 bg-white border border-gray-200 rounded-xl">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="relative" ref={tagRef}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (typeof setTagOpen === "function") setTagOpen((v) => !v);
-                            }}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
-                          >
-                            Tags{" "}
-                            {Array.isArray(filterTags) && filterTags.length > 0 && (
-                              <span className="text-gray-500">({filterTags.length})</span>
-                            )}
-                            <ChevronDown className="h-4 w-4 text-gray-500" />
-                          </button>
-
-                          {tagOpen && (
-                            <div className="absolute z-20 mt-2 w-64 rounded-md border border-gray-200 bg-white shadow-lg p-2">
-                              <div className="flex items-center gap-2 px-2 py-1 mb-2 rounded bg-gray-50">
-                                <Search className="h-4 w-4 text-gray-400" />
-                                <input
-                                  placeholder="Search tags…"
-                                  value={tagQuery || ""}
-                                  onChange={(e) => typeof setTagQuery === "function" && setTagQuery(e.target.value)}
-                                  className="w-full bg-transparent text-sm outline-none"
-                                />
-                              </div>
-                              <div className="max-h-56 overflow-auto pr-1">
-                                {safeBaseTags
-                                  .filter((t) => String(t).toLowerCase().includes(String(tagQuery || "").toLowerCase()))
-                                  .map((t) => (
-                                    <label
-                                      key={t}
-                                      className="flex items-center gap-2 px-2 py-1 text-sm hover:bg-gray-50 rounded cursor-pointer"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={Array.isArray(filterTags) ? filterTags.includes(t) : false}
-                                        onChange={() => {
-                                          if (typeof setFilterTags !== "function") return;
-                                          setFilterTags((prev) => {
-                                            const p = Array.isArray(prev) ? prev : [];
-                                            return p.includes(t) ? p.filter((x) => x !== t) : [...p, t];
-                                          });
-                                        }}
-                                        className="accent-emerald-600"
-                                      />
-                                      {t}
-                                    </label>
-                                  ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="relative">
-                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <input
-                            value={search || ""}
-                            onChange={(e) => typeof setSearch === "function" && setSearch(e.target.value)}
-                            placeholder="Search title, tags, text…"
-                            className="pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm bg-white w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          />
-                        </div>
-
-                        <div className="flex-1" />
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">Sort by:</span>
-                          <select
-                            value={sortBy || "date"}
-                            onChange={(e) => typeof setSortBy === "function" && setSortBy(e.target.value)}
-                            className="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          >
-                            <option value="date">Date</option>
-                            <option value="grade">Grade</option>
-                            <option value="words">Word Count</option>
-                            <option value="title">Title</option>
-                          </select>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">Cards per row</span>
-                          <select
-                            value={cardsPerRow ?? 3}
-                            onChange={(e) =>
-                              typeof setCardsPerRow === "function" && setCardsPerRow(Number(e.target.value))
-                            }
-                            className="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          >
-                            {[1, 2, 3, 4, 5, 6].map((n) => (
-                              <option key={n} value={n}>
-                                {n}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {isAnyFilter && (
-                        <div className="flex flex-wrap items-center gap-2 mt-3">
-                          {(Array.isArray(filterTags) ? filterTags : []).map((t) => (
-                            <span
-                              key={`tag-${t}`}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full"
-                            >
-                              Tag: {t}
-                              <button
-                                className="ml-1 rounded hover:bg-gray-200 p-0.5"
-                                onClick={() => {
-                                  if (typeof setFilterTags !== "function") return;
-                                  setFilterTags((prev) => (Array.isArray(prev) ? prev.filter((x) => x !== t) : []));
-                                }}
-                                aria-label={`Remove ${t}`}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          ))}
-
-                          {String(search || "").trim().length > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
-                              Search: “{search}”
-                              <button
-                                className="ml-1 rounded hover:bg-gray-200 p-0.5"
-                                onClick={() => typeof setSearch === "function" && setSearch("")}
-                                aria-label="Clear search"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          )}
-
-                          <button
-                            onClick={() => typeof clearFilters === "function" && clearFilters()}
-                            className="ml-1 text-xs text-gray-600 underline underline-offset-2 hover:text-gray-800"
-                          >
-                            Clear all
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 <div className={`mt-4 grid ${safeGetGridCols()} gap-4`}>
