@@ -93,7 +93,16 @@ def looks_like_menu_paste(client):
     action = event_action(client)
     if action in Actions.MENU_PASTE:
         return True
-    return action == "contextmenu"
+    if action == "contextmenu":
+        return True
+    # Catches both right-click → Paste and Edit menu → Paste
+    if action == "mouseclick":
+        mc = client.get("mouseclick") or {}
+        inner_text = str(mc.get("target.innerText") or "").strip().lower()
+        class_name = str(mc.get("target.className") or "")
+        if inner_text == "paste" and "goog-menuitem-label" in class_name:
+            return True
+    return False
 
 
 def timestamp_ms(event, client=None):
@@ -165,6 +174,8 @@ def default_paste_state():
             "medium_21_200": 0,
             "long_201_plus": 0,
         },
+        "last_right_click_ms": 0,
+        "pending_paste_source": None,
         "recent_pastes": [],
         "awaiting_paste_until": 0,
         "maybe_menu_paste_until": 0,
@@ -191,6 +202,12 @@ def update_paste_state(event, state):
     ts_ms = timestamp_ms(event, client)
     action = event_action(client)
 
+    if action == "mouseclick": #Fixed
+        mc = client.get("mouseclick") or {}
+        if mc.get("button") == 2:
+            state["last_right_click_ms"] = ts_ms
+            return state  # not a paste itself, just record it
+
     if is_paste_keyboard(client):
         if ts_ms - state.get("last_paste_signal_ms", 0) <= DEDUP_MS:
             return False
@@ -210,8 +227,11 @@ def update_paste_state(event, state):
         )
         return state
 
-    if looks_like_menu_paste(client):
+    if looks_like_menu_paste(client):                     # FIXED : now detects mouseclick Paste
         state["maybe_menu_paste_until"] = ts_ms + MENU_FLAG_MS
+        # FIX 4: label right-click paste vs. menubar paste
+        is_right_click = (ts_ms - state.get("last_right_click_ms", 0)) < MENU_FLAG_MS
+        state["pending_paste_source"] = "right_click" if is_right_click else "menubar"
         return state
 
     if action != Actions.GDOCS_SAVE:
