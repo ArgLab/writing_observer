@@ -89,19 +89,40 @@ def is_paste_keyboard(client):
     return _is_key_combo(keys_info(client), "v", "KeyV", 86)
 
 
+def _menu_item_text(client):
+    """Normalize a Google menu item's innerText — strips extra whitespace so
+    labels like 'Paste without formatting Ctrl+Shift+V' collapse cleanly."""
+    mc = client.get("mouseclick") or {}
+    return re.sub(r"\s+", " ", str(mc.get("target.innerText") or "")).strip().lower()
+
+
 def looks_like_menu_paste(client):
     action = event_action(client)
     if action in Actions.MENU_PASTE:
         return True
     if action == "contextmenu":
         return True
-    # Catches both right-click → Paste and Edit menu → Paste
+
     if action == "mouseclick":
         mc = client.get("mouseclick") or {}
-        inner_text = str(mc.get("target.innerText") or "").strip().lower()
+        inner_text = _menu_item_text(client)
         class_name = str(mc.get("target.className") or "")
-        if inner_text == "paste" and "goog-menuitem-label" in class_name:
+
+        # Match any Google Docs menu item element
+        is_google_menu_item = (
+            "goog-menuitem-label" in class_name
+            or "goog-menuitem-content" in class_name
+            or "goog-menuitem" in class_name
+        )
+
+        # startswith("paste") catches all variants:
+        #   "paste"
+        #   "paste ctrl+v"
+        #   "paste without formatting"
+        #   "paste without formatting ctrl+shift+v"
+        if is_google_menu_item and inner_text.startswith("paste"):
             return True
+
     return False
 
 
