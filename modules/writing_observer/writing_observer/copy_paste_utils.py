@@ -6,6 +6,7 @@ events.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 PASTE_WAIT_MS = 2500
 MENU_FLAG_MS = 1500
