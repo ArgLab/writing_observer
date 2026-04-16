@@ -17,8 +17,8 @@ MAX_RECURSION_DEPTH = 50
 
 
 class Actions:
-    COPY = frozenset({"copy", "clipboard_copy", "gdocs_copy", "menu_copy", "edit_copy"})
-    CUT = frozenset({"cut", "clipboard_cut", "gdocs_cut", "menu_cut", "edit_cut"})
+    COPY = frozenset({"copy", "clipboard_copy", "gdocs_copy", "menu_copy", "edit_copy", "contextmenu_copy"})
+    CUT = frozenset({"cut", "clipboard_cut", "gdocs_cut", "menu_cut", "edit_cut", "contextmenu_cut"})
     PASTE = frozenset({"paste", "clipboard_paste", "gdocs_paste", "insert_from_clipboard"})
     MENU_PASTE = frozenset({"menu_paste", "edit_paste", "contextmenu_paste"})
     GDOCS_SAVE = "google_docs_save"
@@ -73,14 +73,28 @@ def is_copy(client):
     action = event_action(client)
     if action in Actions.COPY:
         return True
-    return _is_key_combo(keys_info(client), "c", "KeyC", 67)
+
+    if _menu_item_startswith(client, "copy"):
+        return True
+
+    info = keys_info(client)
+    return info["event_type"] == "keydown" and info["ctrl_or_meta"] and (
+        info["key"] == "c" or info["code"] == "KeyC" or info["key_code"] == 67
+    )
 
 
 def is_cut(client):
     action = event_action(client)
     if action in Actions.CUT:
         return True
-    return _is_key_combo(keys_info(client), "x", "KeyX", 88)
+
+    if _menu_item_startswith(client, "cut"):
+        return True
+
+    info = keys_info(client)
+    return info["event_type"] == "keydown" and info["ctrl_or_meta"] and (
+        info["key"] == "x" or info["code"] == "KeyX" or info["key_code"] == 88
+    )
 
 
 def is_paste_keyboard(client):
@@ -89,6 +103,23 @@ def is_paste_keyboard(client):
         return True
     return _is_key_combo(keys_info(client), "v", "KeyV", 86)
 
+
+def _is_google_menu_item(client):
+    mc = client.get("mouseclick") or {}
+    class_name = str(mc.get("target.className") or "")
+    return (
+        "goog-menuitem-label" in class_name
+        or "goog-menuitem-content" in class_name
+        or "goog-menuitem" in class_name
+    )
+
+
+def _menu_item_startswith(client, action_name):
+    if event_action(client) != "mouseclick":
+        return False
+    if not _is_google_menu_item(client):
+        return False
+    return _menu_item_text(client).startswith(action_name)
 
 def _menu_item_text(client):
     """Normalize a Google menu item's innerText — strips extra whitespace so
@@ -105,23 +136,14 @@ def looks_like_menu_paste(client):
         return True
 
     if action == "mouseclick":
-        mc = client.get("mouseclick") or {}
+
         inner_text = _menu_item_text(client)
-        class_name = str(mc.get("target.className") or "")
-
-        # Match any Google Docs menu item element
-        is_google_menu_item = (
-            "goog-menuitem-label" in class_name
-            or "goog-menuitem-content" in class_name
-            or "goog-menuitem" in class_name
-        )
-
         # startswith("paste") catches all variants:
         #   "paste"
         #   "paste ctrl+v"
         #   "paste without formatting"
         #   "paste without formatting ctrl+shift+v"
-        if is_google_menu_item and inner_text.startswith("paste"):
+        if _is_google_menu_item(client) and inner_text.startswith("paste"):
             return True
 
     return False
