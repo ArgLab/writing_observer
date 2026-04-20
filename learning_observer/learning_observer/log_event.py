@@ -80,9 +80,28 @@ if not os.path.exists(paths.logs("startup")):
     print("Creating path for startup logs...")
     os.mkdir(paths.logs("startup"))
 
-mainlog = open(paths.logs("main_log.json"), "ab", 0)
+# These will be lazily opened so that we can incorporate the port number
+# (set later via `set_log_port`) into the filename.
+mainlog = None
 files = {}
 startup_state = {}
+
+# The active port for the running system. Used to namespace per-port log
+# files like `main_log-8888.json` and `debug-8888.log`.
+LOG_PORT = None
+
+
+def set_log_port(port):
+    '''
+    Store the active port for naming log files.
+    '''
+    global LOG_PORT
+    LOG_PORT = port
+
+
+# Default rotation values used before pmss settings are available.
+_DEFAULT_ROTATION_MAX_BYTES = 100 * 1024 * 1024
+_DEFAULT_ROTATION_BACKUP_COUNT = -1
 
 
 # Do we make files for exceptions? Do we print extra stuff on the console?
@@ -114,6 +133,19 @@ pmss.register_field(
                 '`SIMPLE`: print simple debug messages\n'\
                 '`EXTENDED`: print debug message with stack trace and timestamp'
 )
+pmss.register_field(
+    name='file_rotation_max_bytes',
+    type=pmss.pmsstypes.TYPES.integer,
+    description='Maximum log size in bytes before `main_log.json` and `debug.log` rotate.',
+    default=_DEFAULT_ROTATION_MAX_BYTES
+)
+pmss.register_field(
+    name='file_rotation_backup_count',
+    type=pmss.pmsstypes.TYPES.integer,
+    description='Number of backup log files to keep; negative values keep all backups.',
+    default=_DEFAULT_ROTATION_BACKUP_COUNT
+)
+
 
 class LogDestination(Enum):
     '''
@@ -127,6 +159,151 @@ class LogDestination(Enum):
 # console and to the log file.
 DEBUG_LOG_LEVEL = LogLevel.SIMPLE
 DEBUG_LOG_DESTINATIONS = (LogDestination.CONSOLE, LogDestination.FILE)
+
+
+def _main_log_basename():
+    '''
+    Compute the basename for the main log file, incorporating the
+    currently configured port (if any).
+    '''
+    if LOG_PORT is None:
+        return "main_log.json"
+    return "main_log-{port}.json".format(port=LOG_PORT)
+
+
+def _debug_log_basename():
+    '''
+    Compute the basename for the debug log file, incorporating the
+    currently configured port (if any).
+    '''
+    if LOG_PORT is None:
+        return "debug.log"
+    return "debug-{port}.log".format(port=LOG_PORT)
+
+
+def _main_log_path():
+    return paths.logs(_main_log_basename())
+
+
+def _debug_log_path():
+    return paths.logs(_debug_log_basename())
+
+
+def _get_rotation_max_bytes():
+    '''
+    Read the configured maximum log file size in bytes. Falls back to a
+    default if the settings system is not yet initialized.
+    '''
+    try:
+        return settings.pmss_settings.file_rotation_max_bytes(types=['logging'])
+    except Exception:
+        return _DEFAULT_ROTATION_MAX_BYTES
+
+
+def _get_rotation_backup_count():
+    '''
+    Read the configured number of backups to keep. Negative values mean
+    to keep all backups. Falls back to a default if the settings system
+    is not yet initialized.
+    '''
+    try:
+        return settings.pmss_settings.file_rotation_backup_count(types=['logging'])
+    except Exception:
+        return _DEFAULT_ROTATION_BACKUP_COUNT
+
+
+def _enforce_backup_count(filepath):
+    '''
+    Trim the number of rotated backups so that at most `backup_count`
+    remain. Negative values mean keep all backups.
+    '''
+    backup_count = _get_rotation_backup_count()
+    if backup_count < 0:
+        return
+    directory = os.path.dirname(filepath)
+    basename = os.path.basename(filepath)
+    if not os.path.isdir(directory):
+        return
+    prefix = basename + "."
+    backups = []
+    for entry in os.listdir(directory):
+        if entry.startswith(prefix):
+            backups.append(entry)
+    # Sort so oldest (smallest timestamp suffix) come first.
+    backups.sort()
+    while len(backups) > backup_count:
+        oldest = backups.pop(0)
+        try:
+            os.remove(os.path.join(directory, oldest))
+        except OSError:
+            # Best-effort cleanup; don't crash the logger.
+            pass
+
+
+def _should_rotate(filepath):
+    '''
+    Returns True if `filepath` exists and exceeds the configured size.
+    '''
+    try:
+        if not os.path.exists(filepath):
+            return False
+        return os.path.getsize(filepath) >= _get_rotation_max_bytes()
+    except OSError:
+        return False
+
+
+def _rotate_file(filepath):
+    '''
+    Rename `filepath` to a timestamp-suffixed backup and enforce the
+    configured number of backups. Caller is responsible for closing any
+    open handle to `filepath` first.
+    '''
+    if not os.path.exists(filepath):
+        return
+    timestamp_suffix = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    rotated_filename = "{path}.{suffix}".format(path=filepath, suffix=timestamp_suffix)
+    try:
+        os.rename(filepath, rotated_filename)
+    except OSError:
+        # If renaming fails, we'd rather keep logging to the existing
+        # file than crash.
+        return
+    _enforce_backup_count(filepath)
+
+
+def _get_main_log_fp():
+    '''
+    Return an open file handle for the main log file. Handles
+    re-opening when the port (and therefore filename) changes, as well
+    as size-based rotation.
+    '''
+    global mainlog
+    target = _main_log_path()
+    current_name = getattr(mainlog, 'name', None) if mainlog is not None else None
+
+    # If the target filename changed (e.g., because the port was set
+    # after import), close the old handle.
+    if mainlog is not None and current_name != target:
+        try:
+            mainlog.close()
+        except Exception:
+            pass
+        mainlog = None
+
+    # Rotate the existing file if it's too big.
+    if mainlog is not None and _should_rotate(target):
+        try:
+            mainlog.close()
+        except Exception:
+            pass
+        mainlog = None
+        _rotate_file(target)
+    elif mainlog is None and _should_rotate(target):
+        _rotate_file(target)
+
+    if mainlog is None:
+        mainlog = open(target, "ab", 0)
+    return mainlog
 
 
 @learning_observer.prestartup.register_init_function
@@ -210,7 +387,7 @@ def log_event(event, filename=None, preencoded=False, timestamp=False):
     This isn't done, but it's how we log events for now.
     '''
     if filename is None:
-        log_file_fp = mainlog
+        log_file_fp = _get_main_log_fp()
     elif filename in files:
         log_file_fp = files[filename]
     else:
@@ -280,7 +457,11 @@ def debug_log(*args):
 
     # Print to file. Only helpful for development.
     if LogDestination.FILE in DEBUG_LOG_DESTINATIONS:
-        with open(paths.logs("debug.log"), "a", encoding='utf-8') as fp:
+        debug_path = _debug_log_path()
+        # Rotate the debug log if it has exceeded the configured size.
+        if _should_rotate(debug_path):
+            _rotate_file(debug_path)
+        with open(debug_path, "a", encoding='utf-8') as fp:
             fp.write(message.strip() + "\n")
 
     # Ideally, we'd like to be able to log these somewhere which won't cause cascading failures.
