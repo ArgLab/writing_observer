@@ -14,6 +14,7 @@ import {
   Home
 } from "lucide-react";
 import { navigateTo } from "../utils/navigation";
+import { getConfiguredWsOrigin } from "../utils/ws";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);          // mobile sheet
@@ -39,7 +40,9 @@ export default function Navbar() {
   useEffect(() => {
     const loadCourseDashboards = async () => {
       try {
-        const response = await fetch("/webapi/course_dashboards");
+        const wsOrigin = getConfiguredWsOrigin();
+        const apiOrigin = wsOrigin.replace(/^ws/, "http");
+        const response = await fetch(`${apiOrigin}/webapi/course_dashboards`);
         if (!response.ok) return;
         const dashboards = await response.json();
         if (!Array.isArray(dashboards)) return;

@@ -1096,7 +1096,8 @@ export default function EssayComparison() {
   const leftDocId = docIds[0] || "";
   const rightDocId = docIds[1] || "";
 
-  const enabled = urlReady && !!studentID && docIds.length === 2;
+  const hasCourseId = courseId !== undefined && courseId !== null && String(courseId).trim().length > 0;
+  const enabled = urlReady && hasCourseId && !!studentID && docIds.length === 2;
   const missingParams = urlReady && (!studentID || docIds.length !== 2);
 
   const [selectedMetrics, setSelectedMetrics] = useState([
@@ -1113,7 +1114,7 @@ export default function EssayComparison() {
   const origin = getConfiguredWsOrigin();
 
   const dataScope = useMemo(() => {
-    if (!urlReady || !studentID) {
+    if (!urlReady || !studentID || !hasCourseId) {
       return {
         wo: {
           execution_dag: "writing_observer",
@@ -1146,7 +1147,7 @@ export default function EssayComparison() {
         },
       },
     };
-  }, [urlReady, studentID, courseId, docIds, selectedMetrics]);
+  }, [urlReady, studentID, hasCourseId, courseId, docIds, selectedMetrics]);
 
   const { data: loData, errors: loErrors, connection: loConnection } = useLOConnectionDataManager({
     url: `${origin}/wsapi/communication_protocol`,
@@ -1197,10 +1198,35 @@ export default function EssayComparison() {
   const isDocsLoading = enabled && !docsReady;
   // -------------------------------------------------------------------
 
+  const leftDocLoading = enabled && !leftTextNonEmpty;
+  const rightDocLoading = enabled && !rightTextNonEmpty;
+
   const leftText = leftHasTextField ? leftDoc?.text || "" : "";
   const rightText = rightHasTextField ? rightDoc?.text || "" : "";
 
-  const showInlineWarning = enabled && isDocsLoading && !!loErrors;
+  const hasLoadErrors = useMemo(() => {
+    if (!enabled || !loErrors) return false;
+    if (Array.isArray(loErrors)) return loErrors.length > 0;
+    if (typeof loErrors === "object") return Object.keys(loErrors).length > 0;
+    return true;
+  }, [enabled, loErrors]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" && hasLoadErrors) {
+      console.warn("[students/compare] Non-blocking LO warnings detected:", loErrors);
+    }
+  }, [hasLoadErrors, loErrors]);
+
+  const hasPendingMetricData = useMemo(() => {
+    if (!enabled || !leftTextNonEmpty || !rightTextNonEmpty) return false;
+    return selectedMetrics.some((metricId) => {
+      const leftMetric = leftDoc?.[metricId];
+      const rightMetric = rightDoc?.[metricId];
+      return !leftMetric || !rightMetric;
+    });
+  }, [enabled, leftTextNonEmpty, rightTextNonEmpty, selectedMetrics, leftDoc, rightDoc]);
+
+  const showLoadingIndicator = isDocsLoading || hasPendingMetricData;
 
   const [leftEssay, setLeftEssay] = useState(() => buildEssayFromDoc({ docId: leftDocId, text: "", side: "left" }));
   const [rightEssay, setRightEssay] = useState(() => buildEssayFromDoc({ docId: rightDocId, text: "", side: "right" }));
@@ -1208,14 +1234,12 @@ export default function EssayComparison() {
   useEffect(() => {
     setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: "", side: "left", title: docTitle(leftDocId) }));
     setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: "", side: "right", title: docTitle(rightDocId) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leftDocId, rightDocId, docTitle]);
 
   useEffect(() => {
     if (!enabled) return;
     if (leftHasTextField) setLeftEssay(buildEssayFromDoc({ docId: leftDocId, text: leftText, side: "left", title: docTitle(leftDocId) }));
     if (rightHasTextField) setRightEssay(buildEssayFromDoc({ docId: rightDocId, text: rightText, side: "right", title: docTitle(rightDocId) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, leftHasTextField, rightHasTextField, leftDocId, rightDocId, leftText, rightText, docTitle]);
 
   /* ---------------------- CUSTOM TOOLTIP STATE ---------------------- */
@@ -1310,6 +1334,15 @@ export default function EssayComparison() {
     },
     [updateUrlIds]
   );
+
+  const swapDocSides = useCallback(() => {
+    setDocIds((prev) => {
+      if (!Array.isArray(prev) || prev.length < 2) return prev;
+      const next = [prev[1] || "", prev[0] || ""];
+      updateUrlIds(next);
+      return next;
+    });
+  }, [updateUrlIds]);
 
   /* ---------------------- Replace Modal (no shifting, full doc list) ---------------------- */
   const [replaceModal, setReplaceModal] = useState({ open: false, side: "left" });
@@ -1660,28 +1693,41 @@ export default function EssayComparison() {
       </div>
 
       <div className="px-6 pb-6">
-        {isDocsLoading ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <div className="text-sm text-gray-700 font-medium">Loading documents…</div>
+        {showLoadingIndicator ? (
+          <div className="mb-4 bg-white rounded-xl border border-emerald-200 shadow-sm px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-emerald-800">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span className="font-medium">
+                {isDocsLoading ? "Loading document data…" : "Refreshing selected metrics…"}
+              </span>
             </div>
-            <div className="mt-2 text-xs text-gray-500">
-              Waiting until both documents return non-empty <span className="font-mono">text</span>.
+            <div className="mt-1 text-xs text-emerald-700/90">
+              Keeping the current comparison visible while new data arrives.
             </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        ) : null}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* ✅ Sidebar replaced with MetricsPanel */}
             <div className="hidden lg:block lg:col-span-3">
               <MetricsPanel metrics={selectedMetrics} setMetrics={setSelectedMetrics} title="Metrics" stickyTopClassName="top-24" />
             </div>
 
             <section className="lg:col-span-9">
-              <div className="mb-4 lg:hidden">
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={swapDocSides}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700"
+                  type="button"
+                  title="Swap which document is shown on the left and right"
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Swap documents
+                </button>
+
                 <button
                   onClick={openMetricsModal}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700 lg:hidden"
                   type="button"
                 >
                   <ListCollapse className="h-4 w-4" />
@@ -1689,11 +1735,6 @@ export default function EssayComparison() {
                 </button>
               </div>
 
-              {showInlineWarning ? (
-                <div className="mb-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  Some data errors were reported while loading documents.
-                </div>
-              ) : null}
 
               {/* Essays */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1738,18 +1779,30 @@ export default function EssayComparison() {
                   </div>
 
                   <div className="p-6 py-2 bg-white h-[16rem] overflow-y-auto">
-                    <div className="text-xs text-gray-500 mb-3">
-                      Hover highlights to see metric tooltip.
-                      {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
-                    </div>
-                    <HighlightedEssay
-                      doc={leftDoc}
-                      activeMetricIds={activeMetricIds}
-                      containerRef={leftEssayRef}
-                      onShowTooltip={onShowTooltip}
-                      onMoveTooltip={onMoveTooltip}
-                      onHideTooltip={onHideTooltip}
-                    />
+                    {leftDocLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <RefreshCw className="h-5 w-5 animate-spin text-emerald-600 mx-auto" />
+                          <div className="mt-2 text-sm text-gray-700 font-medium">Loading selected document…</div>
+                          <div className="mt-1 text-xs text-gray-500">Other sections stay available while this side updates.</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-xs text-gray-500 mb-3">
+                          Hover highlights to see metric tooltip.
+                          {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
+                        </div>
+                        <HighlightedEssay
+                          doc={leftDoc}
+                          activeMetricIds={activeMetricIds}
+                          containerRef={leftEssayRef}
+                          onShowTooltip={onShowTooltip}
+                          onMoveTooltip={onMoveTooltip}
+                          onHideTooltip={onHideTooltip}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1794,18 +1847,30 @@ export default function EssayComparison() {
                   </div>
 
                   <div className="p-6 py-2 bg-white h-[16rem] overflow-y-auto">
-                    <div className="text-xs text-gray-500 mb-3">
-                      Hover highlights to see metric tooltip.
-                      {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
-                    </div>
-                    <HighlightedEssay
-                      doc={rightDoc}
-                      activeMetricIds={activeMetricIds}
-                      containerRef={rightEssayRef}
-                      onShowTooltip={onShowTooltip}
-                      onMoveTooltip={onMoveTooltip}
-                      onHideTooltip={onHideTooltip}
-                    />
+                    {rightDocLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <RefreshCw className="h-5 w-5 animate-spin text-emerald-600 mx-auto" />
+                          <div className="mt-2 text-sm text-gray-700 font-medium">Loading selected document…</div>
+                          <div className="mt-1 text-xs text-gray-500">Other sections stay available while this side updates.</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-xs text-gray-500 mb-3">
+                          Hover highlights to see metric tooltip.
+                          {focusedMetricId ? <span className="ml-2">Showing only the focused metric highlights.</span> : null}
+                        </div>
+                        <HighlightedEssay
+                          doc={rightDoc}
+                          activeMetricIds={activeMetricIds}
+                          containerRef={rightEssayRef}
+                          onShowTooltip={onShowTooltip}
+                          onMoveTooltip={onMoveTooltip}
+                          onHideTooltip={onHideTooltip}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1936,7 +2001,6 @@ export default function EssayComparison() {
               )}
             </section>
           </div>
-        )}
       </div>
     </div>
   );
