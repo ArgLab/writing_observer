@@ -6,6 +6,7 @@ events.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 PASTE_WAIT_MS = 2500
 MENU_FLAG_MS = 1500
@@ -16,8 +17,8 @@ MAX_RECURSION_DEPTH = 50
 
 
 class Actions:
-    COPY = frozenset({"copy", "clipboard_copy", "gdocs_copy", "menu_copy", "edit_copy"})
-    CUT = frozenset({"cut", "clipboard_cut", "gdocs_cut", "menu_cut", "edit_cut"})
+    COPY = frozenset({"copy", "clipboard_copy", "gdocs_copy", "menu_copy", "edit_copy", "contextmenu_copy"})
+    CUT = frozenset({"cut", "clipboard_cut", "gdocs_cut", "menu_cut", "edit_cut", "contextmenu_cut"})
     PASTE = frozenset({"paste", "clipboard_paste", "gdocs_paste", "insert_from_clipboard"})
     MENU_PASTE = frozenset({"menu_paste", "edit_paste", "contextmenu_paste"})
     GDOCS_SAVE = "google_docs_save"
@@ -72,14 +73,28 @@ def is_copy(client):
     action = event_action(client)
     if action in Actions.COPY:
         return True
-    return _is_key_combo(keys_info(client), "c", "KeyC", 67)
+
+    if _menu_item_startswith(client, "copy"):
+        return True
+
+    info = keys_info(client)
+    return info["event_type"] == "keydown" and info["ctrl_or_meta"] and (
+        info["key"] == "c" or info["code"] == "KeyC" or info["key_code"] == 67
+    )
 
 
 def is_cut(client):
     action = event_action(client)
     if action in Actions.CUT:
         return True
-    return _is_key_combo(keys_info(client), "x", "KeyX", 88)
+
+    if _menu_item_startswith(client, "cut"):
+        return True
+
+    info = keys_info(client)
+    return info["event_type"] == "keydown" and info["ctrl_or_meta"] and (
+        info["key"] == "x" or info["code"] == "KeyX" or info["key_code"] == 88
+    )
 
 
 def is_paste_keyboard(client):
@@ -89,11 +104,49 @@ def is_paste_keyboard(client):
     return _is_key_combo(keys_info(client), "v", "KeyV", 86)
 
 
+def _is_google_menu_item(client):
+    mc = client.get("mouseclick") or {}
+    class_name = str(mc.get("target.className") or "")
+    return (
+        "goog-menuitem-label" in class_name
+        or "goog-menuitem-content" in class_name
+        or "goog-menuitem" in class_name
+    )
+
+
+def _menu_item_startswith(client, action_name):
+    if event_action(client) != "mouseclick":
+        return False
+    if not _is_google_menu_item(client):
+        return False
+    return _menu_item_text(client).startswith(action_name)
+
+def _menu_item_text(client):
+    """Normalize a Google menu item's innerText — strips extra whitespace so
+    labels like 'Paste without formatting Ctrl+Shift+V' collapse cleanly."""
+    mc = client.get("mouseclick") or {}
+    return re.sub(r"\s+", " ", str(mc.get("target.innerText") or "")).strip().lower()
+
+
 def looks_like_menu_paste(client):
     action = event_action(client)
     if action in Actions.MENU_PASTE:
         return True
-    return action == "contextmenu"
+    if action == "contextmenu":
+        return True
+
+    if action == "mouseclick":
+
+        inner_text = _menu_item_text(client)
+        # startswith("paste") catches all variants:
+        #   "paste"
+        #   "paste ctrl+v"
+        #   "paste without formatting"
+        #   "paste without formatting ctrl+shift+v"
+        if _is_google_menu_item(client) and inner_text.startswith("paste"):
+            return True
+
+    return False
 
 
 def timestamp_ms(event, client=None):
@@ -165,6 +218,8 @@ def default_paste_state():
             "medium_21_200": 0,
             "long_201_plus": 0,
         },
+        "last_right_click_ms": 0,
+        "pending_paste_source": None,
         "recent_pastes": [],
         "awaiting_paste_until": 0,
         "maybe_menu_paste_until": 0,
@@ -191,6 +246,12 @@ def update_paste_state(event, state):
     ts_ms = timestamp_ms(event, client)
     action = event_action(client)
 
+    if action == "mouseclick": #Fixed
+        mc = client.get("mouseclick") or {}
+        if mc.get("button") == 2:
+            state["last_right_click_ms"] = ts_ms
+            return state  # not a paste itself, just record it
+
     if is_paste_keyboard(client):
         if ts_ms - state.get("last_paste_signal_ms", 0) <= DEDUP_MS:
             return False
@@ -210,8 +271,11 @@ def update_paste_state(event, state):
         )
         return state
 
-    if looks_like_menu_paste(client):
+    if looks_like_menu_paste(client):                     # FIXED : now detects mouseclick Paste
         state["maybe_menu_paste_until"] = ts_ms + MENU_FLAG_MS
+        # FIX 4: label right-click paste vs. menubar paste
+        is_right_click = (ts_ms - state.get("last_right_click_ms", 0)) < MENU_FLAG_MS
+        state["pending_paste_source"] = "right_click" if is_right_click else "menubar"
         return state
 
     if action != Actions.GDOCS_SAVE:
