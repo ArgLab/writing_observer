@@ -1,0 +1,22 @@
+protocol: http
+config:
+  run_mode: dev
+auth:
+  test_case_insecure: true
+feature_flags: {}
+roster_data:
+  source: all
+aio:
+  session_secret: superdupersecretkey
+  session_max_age: 3600
+kvs:
+  default:
+    type: filesystem
+    path: .lo_kvs
+  memoization:
+    type: stub
+
+event_auth:
+  testcase_auth: {}
+theme:
+  server_name: Learning Observer

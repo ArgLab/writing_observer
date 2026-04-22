@@ -1,0 +1,10 @@
+{{{ header }}}
+
+import React from 'react';
+
+{{{ imports }}}
+
+export function {{ componentName }}( { children } ) {
+  return (
+{{{ xml }}});
+};

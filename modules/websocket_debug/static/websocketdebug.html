@@ -1,0 +1,37 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+  </head>
+  <body>
+    <h1> Web socket debug test! </h1>
+    <p> This is a simple app to test web sockets. </p>
+    <input></input>
+    <button onclick="send()">Send!</button>
+    <br>
+    <br>   
+    <div style="width:800px; height:100px; border:solid;"></div>
+  </body>
+  <script>
+    let socket_in = new WebSocket("wss://"+window.location.hostname+"/wsapi/in/");
+    let socket_out = new WebSocket("wss://"+window.location.hostname+"/wsapi/out/");
+    socket_in.onopen = function() {
+        socket_in.send(JSON.stringify({
+            "event": "metadata_finished",
+            "source": "org.mitros.mirror"
+        }));
+    }
+
+    socket_out.onmessage = function(event) {
+        document.querySelector("div").innerText = event.data;
+    };
+    
+    function send() {
+       var input = document.querySelector("input").value;
+       var event = JSON.stringify({
+          "event": "text",
+          "source": "org.mitros.mirror",
+          data: input});
+       socket_in.send(event);
+    }
+  </script>
+</html>

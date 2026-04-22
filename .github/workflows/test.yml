@@ -1,0 +1,51 @@
+name: Test packages
+
+on: [push]
+
+jobs:
+  test-packages:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ['learning_observer/', 'modules/writing_observer/']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Make
+        run: sudo apt-get install make
+
+      - name: Get list of changed files
+        id: changes
+        run: |
+          git fetch origin master
+          git diff --name-only origin/master HEAD > changed_files.txt
+
+      - name: Check if package has changes
+        id: package_check
+        run: |
+          if grep -qE "^${{ matrix.package }}" changed_files.txt; then
+            echo "run_tests=true" >> $GITHUB_ENV
+          else
+            echo "run_tests=false" >> $GITHUB_ENV
+          fi
+
+      - name: Skip tests if no changes
+        if: env.run_tests == 'false'
+        run: echo "Skipping tests for ${{ matrix.package }} as there are no changes."
+
+      - name: Install the base Learning Observer
+        if: env.run_tests == 'true'
+        run: make install
+
+      - name: Install the package with pip
+        if: env.run_tests == 'true'
+        run: pip install -e ${{ matrix.package }}
+
+      - name: Run tests
+        if: env.run_tests == 'true'
+        run: make test PKG=${{ matrix.package }}

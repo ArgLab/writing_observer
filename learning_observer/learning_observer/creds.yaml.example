@@ -1,0 +1,103 @@
+# We use curly-braces for things which ought to be filled in like passwords and secret keys:
+#
+# 1) These are friendly to templating languages and Python's str.format()
+# 2) These generate dictionaries, and we can throw an exception if unset. If we forget to
+#    throw an exception, these won't give a valid string
+hostname: localhost:8888
+protocol: http
+xmpp:
+  sink: # Receives messages. We'll need many of these.
+    jid: sink@localhost
+    password: {xmpp-sink-password}
+  source: # Sends messages.
+    jid: source@localhost
+    password: {xmpp-source-password}
+  stream: # For debugging
+    jid: stream@localhost
+    password: {xmpp-stream-password}
+auth:
+  google_oauth:  # Remove if you're not using Google auth
+    web:
+      client_id: {google-oauth-client-id}
+      project_id: {google-oauth-project-id}
+      auth_uri: https://accounts.google.com/o/oauth2/auth
+      token_uri: https://oauth2.googleapis.com/token
+      auth_provider_x509_cert_url: https://www.googleapis.com/oauth2/v1/certs
+      client_secret: {google-client-secret}
+      javascript_origins: ["{url}"]
+      # base_scopes: []        # We can override the scopes we ask Google for here
+      # additional_scopes: []  # Or just add a few new ones. Not very tested.
+  password_file: passwd.lo  # Remove if you're not using a password file
+                            # Otherwise, create one with lo_passwd.py
+  http_basic_auth:        # HTTP auth. You probably want to remove this.
+                          # Your server WILL be insecure if you configure
+                          # this incorrectly. Either nginx can verify passwords,
+                          # or we can. The latter isn't fully implemented/tested.
+                          # The former requires nginx to be correctly set up.
+    mode: remove-this         # Can be 'nginx,' or 'password-file'
+    password_file: passwd.lo  # Set this to 'null' if authentication is done by nginx
+#  test_case_insecure: false  # For testing -- no log-in required. NEVER enable on a live server.
+#  demo_insecure: false # Similar to test-case, but stochastically give name, etc.
+pubsub:
+    type: stub  # stub for in-memory debugging, redis for small-scale prod. xmpp will bring scale
+redis_connection:
+  redis_host: localhost
+  redis_port: 6379
+  redis_password: yoursupersecurepassword
+kvs:
+    # stub for in-memory debugging
+    # redis_ephemeral for redis / debugging (object disappear)
+    # redis for deploy
+    # If using redis_ephemeral, persist objects for 60s = 1 minute
+    # I typically use:
+    # * 1-10s for test cases
+    # * 1-5 minutes for interactive debugging
+    # * 6-24 hours for development
+  default:
+    type: stub
+    expiry: 6000
+  memoization:
+    type: redis_ephemeral
+    expiry: 60
+roster_data:
+    source: all  # Can be set to google_api, all, test, or filesystem
+aio:  # User session; used for log-ins.
+    session_secret: {unique-aio-session-key}  # This should be a unique secret key for YOUR deployment
+    session_max_age: 3600  # In seconds. This may be short for auth dev (e.g. <5 mins), intermediate for deploy (a few hours?), and long for e.g. testing other parts of the system (or set to null, for lifetime of the browser)
+config:
+    run_mode: dev   # "dev" versus "deploy". E.g. Do we crash on errors? Or log them and keep going?
+    debug: []  # add "tracemalloc" to the list to enable memory leak debugging
+logging:
+    # Note that EXTENDED logging includes a bit of the stack trace. This
+    # is super-valuable for debugging, but also super-slow. As of this writing,
+    # with EXTENDED logging, on a fast computer, you'll probably cap out
+    # at e.g.  maybe 3 students using the Writing Observer. All of this time
+    # will be spent inside of inspect (which is slow enough I'm almost inclined
+    # to consider this a bug in inspect, so perhaps in newer Python versions,
+    # this will be faster).
+    debug_log_level: SIMPLE     # NONE, SIMPLE, or EXTENDED
+    debug_log_destinations:     # List of where they go. CONSOLE or FILE
+        - CONSOLE
+        - FILE
+theme:
+    server_name: Learning Observer
+    front_page_pitch: Learning Observer is an experimental dashboard. If you'd like to be part of the experiment, please contact us. If you're already part of the experiment, log in!
+    logo_big: /static/media/logo-clean.jpg
+event_auth:
+    local_storage:
+        userfile: students.yaml
+        allow_guest: true
+    # chromebook:            # May be necessary to support execution on chromebooks.
+    #    allow_guest: true   # uncomment for testing or deployment as needed.
+    # testcase_auth: {}
+feature_flags: {}  # For enabling / disabling features in development. Useful
+                   # ones include:
+                   # * google_routes (for debugging / developing Google APIs)
+                   # * save_google_ajax (for saving Google API calls -- NOT FOR PROD)
+                   # * use_google_ajax (for using saved Google API calls -- AGAIN, NOT FOR PROD)
+server:
+    port: 8888     # Optional. Pick a different port.
+modules:
+    writing_observer:
+        use_nlp: false
+        openai_api_key: '' # can also be set with OPENAI_API_KEY environment variable

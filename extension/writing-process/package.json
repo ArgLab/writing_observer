@@ -1,0 +1,87 @@
+{
+    "name": "writing-process",
+    "description": "Tracks writing in Google Docs, and provides nifty insights to you and your teachers!",
+    "version": "1.0.0.2",
+    "homepage": "http://chrome.google.com/webstore",
+    "author": "Piotr Mitros, Bradley Erickson",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ArgLab/writing_observer/tree/master/extension/writing-process"
+    },
+    "scripts": {
+        "ext:start": "xt-build -e dev -w",
+        "ext:start:firefox": "xt-build -e dev -p firefox -w",
+        "ext:build": "xt-build -e prod",
+        "ext:build:firefox": "xt-build -e prod -p firefox",
+        "ext:clean": "xt-clean",
+        "ext:docs": "xt-docs",
+        "ext:test": "xt-test",
+        "coverage": "nyc --reporter=lcov npm run test",
+        "ext:sync": "xt-sync",
+        "bundle:build": "webpack --mode production",
+        "bundle": "npm run bundle:build",
+        "bundle:watch": "webpack --watch",
+        "build": "rm -rf dist/ && npm run bundle && npm run ext:build"
+    },
+    "babel": {
+        "presets": [
+            "@babel/preset-env"
+        ]
+    },
+    "eslintIgnore": [
+        "test/**/*"
+    ],
+    "dependencies": {
+        "lo-event": "file:../../module/lo_event"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.23.0",
+        "@babel/preset-env": "^7.22.20",
+        "babel-loader": "^9.1.3",
+        "css-loader": "^6.8.1",
+        "extension-cli": "^1.2.4",
+        "html-loader": "^4.2.0",
+        "style-loader": "^3.3.3",
+        "webpack": "^5.88.2",
+        "webpack-cli": "^5.1.4"
+    },
+    "xtdocs": {
+        "source": {
+            "include": [
+                "README.md",
+                "bundle"
+            ]
+        }
+    },
+    "xtbuild": {
+        "copyAsIs": [
+            "./src/pages/**/*"
+        ],
+        "js_bundles": [
+            {
+                "name": "background",
+                "src": "./src/background.bundle.js"
+            },
+            {
+                "name": "inject",
+                "src": "./src/inject.bundle.js"
+            },
+            {
+                "name": "service_worker",
+                "src": "./src/service_worker.bundle.js"
+            },
+            {
+                "name": "writing_common",
+                "src": "./src/writing_common.bundle.js"
+            },
+            {
+                "name": "writing",
+                "src": "./src/writing.bundle.js"
+            },
+            {
+                "name": "3rdparty/sha256",
+                "src": "./src/3rdparty/sha256.js"
+            }
+        ]
+    }
+}

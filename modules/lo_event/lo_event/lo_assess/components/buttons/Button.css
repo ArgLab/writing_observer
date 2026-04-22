@@ -1,0 +1,12 @@
+.blue-button {
+  padding: 10px;
+  margin-right: 10px; /* Add margin-right to create space between buttons */
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.blue-button:last-child {
+  margin-right: 0; /* Remove margin-right from last button */
+}

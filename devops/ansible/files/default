@@ -1,0 +1,74 @@
+server {
+        # We listen for HTTP on port 80. This is helpful for debugging
+	listen 80 default_server;
+	listen [::]:80 default_server;
+
+	# We listen for HTTPS on port 443 too. This is managed when we set up certbot.
+
+	# Set this up when installing:
+	server_name {SERVER_NAME};
+
+	# We're mostly not using static web files right now, but it's good to have these around.
+	root /var/www/html;
+	index index.html index.htm index.nginx-debian.html;
+
+	# We will eventually want to split our (non-CORS) data intake and our (CORS) dashboards
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+                add_header "Access-Control-Allow-Origin"  *;
+                add_header "Access-Control-Allow-Methods" "GET, POST, OPTIONS, HEAD";
+                add_header "Access-Control-Allow-Headers" "Authorization, Origin, X-Requested-With, Content-Type, Accept";
+
+                try_files $uri $uri/ =404;
+	}
+
+	location /app/ {
+		 # For now, this is for debugging and development. We'd like to be able to launch arbitrary
+		 # web apps. In the longer-term, it's likely the whole system might move here (and who knows
+		 # if this comment will update).
+		 #
+		 # Note we don't add CORS headers for now, but we eventually will need to. We'll need to sort
+		 # through where we add them, though.
+            	 proxy_pass http://localhost:8080/;
+            	 proxy_set_header        X-Real-IP       $remote_addr;
+            	 proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+		 #rewrite ^/app/(.*)$ $1 last;
+            	 if ($request_method = OPTIONS ) {
+               	    return 200;
+            	 }
+	}
+
+	# This is our HTTP API
+	# Note that we disable CORS. We may want to have a version with and without CORS
+        location /webapi/ {
+            proxy_pass http://localhost:8888/webapi/;
+            proxy_set_header        X-Real-IP       $remote_addr;
+            proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+            if ($request_method = OPTIONS ) {
+               add_header "Access-Control-Allow-Origin"  *;
+               add_header "Access-Control-Allow-Methods" "GET, POST, OPTIONS, HEAD";
+               add_header "Access-Control-Allow-Headers" "Authorization, Origin, X-Requested-With, Content-Type, Accept";
+               return 200;
+            }
+        }
+
+	# And our websockets API
+	# We are migrating our streaming analytics to web sockets.
+        location /wsapi/ {
+            proxy_pass http://localhost:8888/wsapi/;
+            proxy_set_header        X-Real-IP       $remote_addr;
+            proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_read_timeout 86400;
+
+            if ($request_method = OPTIONS ) {
+               add_header "Access-Control-Allow-Origin"  *;
+               add_header "Access-Control-Allow-Methods" "GET, POST, OPTIONS, HEAD";
+               add_header "Access-Control-Allow-Headers" "Authorization, Origin, X-Requested-With, Content-Type, Accept";
+               return 200;
+            }
+        }
+}

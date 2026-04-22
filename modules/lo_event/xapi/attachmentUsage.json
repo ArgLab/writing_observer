@@ -1,0 +1,112 @@
+[
+  {
+    "id": 25,
+    "kind": "attachmentUsage",
+    "uri": "http://adlnet.gov/expapi/attachments/signature",
+    "createdAt": "2013-05-01T19:18:00.000Z",
+    "updatedAt": "2013-05-01T19:18:00.000Z",
+    "metadata": {
+      "id": 25,
+      "metadata": {
+        "name": {
+          "en-us": "Signature"
+        },
+        "description": {
+          "en-us": ""
+        }
+      },
+      "uriId": 25,
+      "editNotes": "",
+      "createdAt": "2013-05-01T19:18:00.000Z",
+      "updatedAt": "2013-05-01T19:18:00.000Z"
+    }
+  },
+  {
+    "id": 253,
+    "kind": "attachmentUsage",
+    "uri": "http://id.tincanapi.com/attachment/certificate-of-completion",
+    "createdAt": "2013-11-13T14:19:02.000Z",
+    "updatedAt": "2013-11-13T14:19:02.000Z",
+    "metadata": {
+      "id": 253,
+      "metadata": {
+        "name": {
+          "en-US": "Certificate of Completion"
+        },
+        "description": {
+          "en-US": "Certificate provided upon completion of an exercise, perhaps as part of a formal learning activity."
+        }
+      },
+      "uriId": 253,
+      "editNotes": "",
+      "createdAt": "2013-11-13T14:19:02.000Z",
+      "updatedAt": "2013-11-13T14:19:02.000Z"
+    }
+  },
+  {
+    "id": 252,
+    "kind": "attachmentUsage",
+    "uri": "http://id.tincanapi.com/attachment/contract",
+    "createdAt": "2013-11-13T14:18:31.000Z",
+    "updatedAt": "2013-11-13T14:18:31.000Z",
+    "metadata": {
+      "id": 252,
+      "metadata": {
+        "name": {
+          "en-US": "Contract"
+        },
+        "description": {
+          "en-US": "A contract intended to be legally binding between two parties. May be part of a sales process, hiring process, real estate transaction, etc."
+        }
+      },
+      "uriId": 252,
+      "editNotes": "",
+      "createdAt": "2013-11-13T14:18:31.000Z",
+      "updatedAt": "2013-11-13T14:18:31.000Z"
+    }
+  },
+  {
+    "id": 175,
+    "kind": "attachmentUsage",
+    "uri": "http://id.tincanapi.com/attachment/supporting_media",
+    "createdAt": "2013-08-24T18:52:57.000Z",
+    "updatedAt": "2013-08-24T18:52:57.000Z",
+    "metadata": {
+      "id": 175,
+      "metadata": {
+        "name": {
+          "en-US": "SupportingMedia"
+        },
+        "description": {
+          "en-US": "A media file that supports the experience. For example a video that shows the experience taking place."
+        }
+      },
+      "uriId": 175,
+      "editNotes": "",
+      "createdAt": "2013-08-24T18:52:57.000Z",
+      "updatedAt": "2013-08-24T18:52:57.000Z"
+    }
+  },
+  {
+    "id": 379,
+    "kind": "attachmentUsage",
+    "uri": "http://specification.openbadges.org/xapi/attachment/badge",
+    "createdAt": "2015-03-31T09:08:47.000Z",
+    "updatedAt": "2015-03-31T09:08:47.000Z",
+    "metadata": {
+      "id": 379,
+      "metadata": {
+        "name": {
+          "en-US": "Open Badges Baked Badge Image"
+        },
+        "description": {
+          "en-US": "An attached Baked Badge Image. This is a png image containing additional metadata as defined by the Open Badges specification."
+        }
+      },
+      "uriId": 379,
+      "editNotes": "",
+      "createdAt": "2015-03-31T09:08:47.000Z",
+      "updatedAt": "2015-03-31T09:08:47.000Z"
+    }
+  }
+]

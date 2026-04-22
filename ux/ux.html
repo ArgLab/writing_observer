@@ -1,0 +1,277 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <!-- We use d3.js as our basic JavaScript framework -->
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+
+    <!-- Our stylesheet / CSS framework is Bulma, for now--> 
+    <link rel="stylesheet" href="https://bulma.io/css/bulma-docs.min.css?v=202002231419"/>
+    <link rel="stylesheet" href="ux.css"/>
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+
+    <!-- Templates -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mustache.js/3.1.0/mustache.min.js"></script>
+
+    <!-- We use showdown to render the problems and hints -->
+    <script src="https://cdn.jsdelivr.net/gh/showdownjs/showdown@1.9.1/dist/showdown.js"></script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8">
+    <title> Writing Analysis </title>
+    <!--link rel="stylesheet" href="da.css"/-->
+  </head>
+  <body>
+    <script id="template-tile" type="x-tmpl">
+      <div class="tile is-parent">
+	<article class="tile is-child box">
+	  <nav class="level">
+	    <div class="level-left"><a target="_blank" rel="noopener noreferrer" href="https://voice.google.com/u/0/calls?a=nc,{{phone}}"><span class="icon"> <i class="fas fa-phone-square"></i> </span></a> </div>
+	    <div class="level-item"><p class="title">{{name}}</p></div>
+	    <div class="level-right"><a target="_blank" rel="noopener noreferrer" href="{{google_doc}}"><span class="icon"> <i class="fas fa-expand"></i> </span></a></div>
+	  </nav>
+	  <div class="typing wa-tilebody">
+	    <p><span class="typing-text"></span>❙</p>
+	  </div>
+	  <div class="deane is-hidden wa-tilebody">
+	  </div>
+	  <div class="summary is-hidden wa-tilebody">
+	  </div>
+	  <div class="outline is-hidden wa-tilebody">
+	    To do: This will show an outline and how much is in each sectino
+	  </div>
+	  <div class="timeline is-hidden wa-tilebody">
+	    To do: This will show a timeline of when students started, worked, and had major revisions
+	  </div>
+	  <div class="contact is-hidden wa-tilebody">
+	    <p> <a href="mailto:{{email}}"> <span class="icon"> <i class="fas fa-envelope"></i> </span> {{email}}</a> <img src="media/hubspot/{{avatar}}" height="40%" width="40%" align="right"/><br> 
+	      <a target="_blank" rel="noopener noreferrer" href="https://voice.google.com/u/0/calls?a=nc,{{phone}}"><span class="icon"> <i class="fas fa-phone-square"></i> </span> {{phone}}</a> </p>
+	      {{address}} <br>
+	    <span class="icon">
+	      <i class="fas fa-facebook-square"></i>
+	    </span>
+	  </div>
+	</article>
+      </div>
+    </script>
+
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+      <div class="navbar-brand">
+	<a class="navbar-item" href="https://ets.org">
+	  <img src="media/ETS_Logo.svg" width="30" height="22">
+	</a>
+	
+	<a role="button" class="navbar-burger burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
+	  <span aria-hidden="true"></span>
+	  <span aria-hidden="true"></span>
+	  <span aria-hidden="true"></span>
+	</a>
+      </div>
+      
+      <div id="navbarBasicExample" class="navbar-menu">
+	<div class="navbar-start">
+	  <a class="navbar-item" onclick="load_section('quad_area')">
+            My Students
+	  </a>
+	  <a class="navbar-item" onclick="load_section('trains')">
+            Administration
+	  </a>
+	</div>
+	<div class="navbar-end">
+	  <div class="navbar-item">
+            <div class="buttons">
+              <a class="button is-primary">
+		<strong>My Account</strong>
+              </a>
+              <a class="button is-light">
+		Log out
+              </a>
+            </div>
+	  </div>
+	</div>
+      </div>
+    </nav>
+
+    <section class="section">
+      <div class="container">
+	<div class="tabs">
+	  <ul>
+	    <li class="is-active tilenav tilenav-typing"><a><span class="icon"><i class="fas fa-edit"></i></span>Current Typing</a></li>
+	    <li class="tilenav tilenav-deane"><a><span class="icon"><i class="fas fa-chart-line"></i></span>Deane Graphs</a></li>
+	    <li class="tilenav tilenav-summary"><a><span class="icon"><i class="fas fa-chart-bar"></i></span>Summary Stats</a></li>
+	    <li class="tilenav tilenav-outline"><a><span class="icon"><i class="fas fa-list"></i></span>Outlines</a></li>
+	    <li class="tilenav tilenav-timeline"><a><span class="icon"><i class="fas fa-history"></i></span>Timeline</a></li>
+	    <li class="tilenav tilenav-contact"><a><span class="icon"><i class="fas fa-address-card"></i></span>Contact</a></li>
+	  </ul>
+	</div>
+	<div class="wa-tile-sheet">
+	<div class="tile is-ancestor" style="min-height:350px;">
+	  <div class="tile is-parent wa-flip-container">
+	    <article class="tile is-child box wa-flipper">
+	      <div>
+		<div class="wa-front">
+		  <nav class="level">
+		    <div class="level-item has-text-left">
+	              <p class="title has-text-left">Helene</p>
+		    </div>
+		    <div class="level-item">
+	              <p class="has-text-right">
+			<a><span class="icon"><i class="fas fa-edit"></i></span></a>
+		      </p>
+		    </div>
+		  </nav>
+		  <p><span class="typing"></span>❙</p>
+		</div>
+	      </div>
+	      <!--div class="wa-back">
+		  This is the back
+		  </div-->
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Irene</p>
+	      <p class="subtitle">Subtitle</p>
+	      <p> irene@kong.ma.us <br>
+		408 Wrangler Lane <br>
+		617-889-2292</p>
+	      <span class="icon">
+		<i class="fas fa-facebook"></i>
+	      </span>
+	      <span class="icon">
+		<i class="fas fa-phone-square"></i>
+	      </span>
+	      <span class="icon">
+		<i class="fas fa-envelope"></i>
+	      </span>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Three</p>
+	      <p class="subtitle">Subtitle</p>
+	      <div id="deane">
+	      </div>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Four</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	</div>
+
+      	<div class="tile is-ancestor">
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">One</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Two</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Three</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Four</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	</div>
+
+      	<div class="tile is-ancestor">
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">One</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Two</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Three</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Four</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	</div>
+
+      	<div class="tile is-ancestor">
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">One</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Two</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Three</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Four</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	</div>
+
+      	<div class="tile is-ancestor">
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">One</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Two</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Three</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	  <div class="tile is-parent">
+	    <article class="tile is-child box">
+	      <p class="title">Four</p>
+	      <p class="subtitle">Subtitle</p>
+	    </article>
+	  </div>
+	</div>
+	</div>
+	</div>
+    </section>      
+    
+  </body>
+  <script src="./writing.js" type="module"> </script>
+</html>

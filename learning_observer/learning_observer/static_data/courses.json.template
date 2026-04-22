@@ -1,0 +1,22 @@
+[
+  {
+    "id": "123456789",
+    "name": "Extending Learning Observer",
+    "descriptionHeading": "How to make dashboards",
+    "ownerId": "1234567",
+    "creationTime": "2020-01-01T12:00:00.000Z",
+    "updateTime": "2020-01-01T12:00:00.000Z",
+    "enrollmentCode": "abcdefgh",
+    "courseState": "ACTIVE",
+    "alternateLink": "https://classroom.google.com/c/12345",
+    "teacherGroupEmail": "teachers@localhost",
+    "courseGroupEmail": "coursegroup@localhost",
+    "teacherFolder": {
+      "id": "12345",
+      "title": "Google Drive Course Folder",
+      "alternateLink": "https://drive.google.com/drive/folders/12345"
+    },
+    "guardiansEnabled": false,
+    "calendarId": "12345@group.calendar.google.com"
+  }
+]
