@@ -26,12 +26,24 @@ import learning_observer.settings
 import learning_observer.stream_analytics.helpers as sa_helpers
 import learning_observer.util
 
-import writing_observer
-import writing_observer.awe_nlp
-import writing_observer.languagetool
-import writing_observer.writing_analysis
+try:
+    import writing_observer
+    import writing_observer.awe_nlp
+    import writing_observer.languagetool
+    import writing_observer.writing_analysis
+except ModuleNotFoundError:
+    writing_observer = None
 
 from learning_observer.log_event import debug_log
+
+
+def _require_writing_observer():
+    if writing_observer is None:
+        raise RuntimeError(
+            "writing_observer is required for document processing, "
+            "but is not installed in this environment."
+        )
+
 
 pmss.register_field(
     name='document_processing_delay_seconds',
@@ -93,6 +105,7 @@ async def check_recent_mod_and_not_recent_process(doc_id):
     processing and check whether it is past a specified cutoff
     time (5 minutes).
     '''
+    _require_writing_observer()
     cutoff = learning_observer.settings.pmss_settings.document_processing_delay_seconds(types=['modules', 'writing_observer'])
     student_id = await _determine_student(doc_id)
 
@@ -161,6 +174,7 @@ def fetch_mock_runtime(creds):
 async def start():
     learning_observer.offline.init('creds.yaml')
     global app, KVS
+    _require_writing_observer()
     app = StubApp(asyncio.get_event_loop())
     google_integration.initialize_and_register_routes(app)
     KVS = learning_observer.kvs.KVS()

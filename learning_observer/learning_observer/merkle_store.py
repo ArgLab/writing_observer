@@ -71,7 +71,6 @@ import datetime
 import os
 
 # These should be abstracted out into a visualization library.
-import matplotlib
 import networkx
 import pydot
 
