@@ -67,6 +67,8 @@ runtime.
 | --- | --- | --- | --- |
 | `logging.debug_log_level` | Chooses how verbose diagnostic logging should be (`NONE`, `SIMPLE`, or `EXTENDED`). | inherits environment default | [`learning_observer/learning_observer/log_event.py`](../../learning_observer/learning_observer/log_event.py) |
 | `logging.debug_log_destinations` | Ordered list of destinations that should receive debug logs (`CONSOLE`, `FILE`). | `['CONSOLE', 'FILE']` in development | [`learning_observer/learning_observer/log_event.py`](../../learning_observer/learning_observer/log_event.py) |
+| `logging.file_rotation_max_bytes` | Maximum log size in bytes before `main_log.json` and `debug.log` rotate. | `100 * 1024 * 1024` | [`learning_observer/learning_observer/log_event.py`](../../learning_observer/learning_observer/log_event.py) |
+| `logging.file_rotation_backup_count` | Number of backup log files to keep; negative values keep all backups. | `-1` | [`learning_observer/learning_observer/log_event.py`](../../learning_observer/learning_observer/log_event.py) |
 
 ### Key-value stores (`kvs` namespace)
 
