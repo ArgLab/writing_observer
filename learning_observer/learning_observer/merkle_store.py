@@ -70,10 +70,6 @@ import json
 import datetime
 import os
 
-# These should be abstracted out into a visualization library.
-import networkx
-import pydot
-
 from confluent_kafka import Producer, Consumer
 
 
@@ -406,6 +402,7 @@ class StreamStorage:
         This is used for testing, experimentation, and demonstration. It
         would never scale with real data.
         '''
+        import networkx
         G = networkx.DiGraph()
         for item in self._walk():
             print(item)
@@ -422,6 +419,7 @@ class StreamStorage:
         This is used for testing, experimentation, and demonstration. It
         would never scale with real data.
         '''
+        import pydot
         G = pydot.Dot(graph_type='digraph')
         for item in self._walk():
             node = pydot.Node(item['hash'], label=self._make_label(item))
