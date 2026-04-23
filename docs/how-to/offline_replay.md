@@ -21,15 +21,17 @@ Use the helper functions in `learning_observer/offline.py` to initialize the env
 ```bash
 python - <<'PY'
 import asyncio
+import learning_observer.settings
 from learning_observer import offline
 
-# Prepare the in-memory KVS and reducers for offline replay
+# If you need PMSS overlays, initialize PMSS rulesets before offline.init().
+# This is equivalent to passing:
+#   --pmss-rulesets creds.yaml schools.pmss
+# in normal server startup.
+learning_observer.settings.init_pmss_settings(['creds.yaml', 'schools.pmss'])
+
+# Then load the YAML settings used for offline replay.
 offline.init('creds.yaml')
-
-# TODO: Offline replay currently initializes PMSS with default rulesets only.
-# If you need custom `.pmss` overlays or alternate YAML files, update the
-# offline initializer to accept ruleset paths.
-
 
 # Replace this path with the study log you want to replay
 log_path = "/path/to/your/session.study.log"
@@ -41,6 +43,16 @@ async def main():
 asyncio.run(main())
 PY
 ```
+
+`offline.init()` currently calls:
+
+```python
+learning_observer.settings.init_pmss_settings()
+learning_observer.settings.load_settings(settings)
+```
+
+so when you need custom rulesets, call `init_pmss_settings([...])` first (as
+shown above) and then initialize offline replay.
 
 - `process_file` only accepts study logs ending in `.study.log` or `.study.log.gz` and will reject other log types.
 - If you do not provide a `userid`, a random safe username is generated to avoid inadvertently reusing PII from the log.
