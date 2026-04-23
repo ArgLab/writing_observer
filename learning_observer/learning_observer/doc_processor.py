@@ -17,7 +17,7 @@ import pmss
 
 import learning_observer.auth.utils
 import learning_observer.constants
-import learning_observer.google
+import learning_observer.integrations.google as google_integration
 import learning_observer.kvs
 import learning_observer.offline
 import learning_observer.run
@@ -162,7 +162,7 @@ async def start():
     learning_observer.offline.init('creds.yaml')
     global app, KVS
     app = StubApp(asyncio.get_event_loop())
-    learning_observer.google.initialize_and_register_routes(app)
+    google_integration.initialize_and_register_routes(app)
     KVS = learning_observer.kvs.KVS()
 
     # overwrite aiohttp_session.get_session so the Google API

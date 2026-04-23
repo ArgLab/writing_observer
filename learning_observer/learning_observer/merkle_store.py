@@ -68,14 +68,11 @@ It is very much a prototype. To make this not a prototype, we would need to:
 import hashlib
 import json
 import datetime
-from modulefinder import STORE_GLOBAL
 import os
-from pickle import STOP
 
 # These should be abstracted out into a visualization library.
 import matplotlib
 import networkx
-from learning_observer.incoming_student_event import COUNT
 import pydot
 
 from confluent_kafka import Producer, Consumer
