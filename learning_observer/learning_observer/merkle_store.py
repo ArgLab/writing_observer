@@ -70,6 +70,12 @@ import json
 import datetime
 import os
 
+try:
+    from confluent_kafka import Producer, Consumer
+except:
+    Producer = None
+    Consumer = None
+
 
 def json_dump(obj):
     """
@@ -436,7 +442,6 @@ class KafkaStorage(StreamStorage):
 
     Very little of this is built.
     """
-    from confluent_kafka import Producer, Consumer
     def __init__(self):
         super().__init__()
         raise NotImplementedError
