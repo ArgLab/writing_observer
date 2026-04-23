@@ -24,14 +24,11 @@ import asyncio
 import learning_observer.settings
 from learning_observer import offline
 
-# If you need PMSS overlays, initialize PMSS rulesets before offline.init().
-# This is equivalent to passing:
-#   --pmss-rulesets creds.yaml schools.pmss
-# in normal server startup.
-learning_observer.settings.init_pmss_settings(['creds.yaml', 'schools.pmss'])
-
-# Then load the YAML settings used for offline replay.
-offline.init('creds.yaml')
+# Provide YAML settings and optional PMSS overlays directly.
+offline.init(
+    'creds.yaml',
+    pmss_rulesets=['creds.yaml', 'schools.pmss']
+)
 
 # Replace this path with the study log you want to replay
 log_path = "/path/to/your/session.study.log"
@@ -44,15 +41,14 @@ asyncio.run(main())
 PY
 ```
 
-`offline.init()` currently calls:
+`offline.init()` accepts `pmss_rulesets` and forwards them to
+`learning_observer.settings.init_pmss_settings(...)` before loading settings.
+This mirrors startup behavior where the web server accepts
+`--pmss-rulesets creds.yaml schools.pmss`.
 
-```python
-learning_observer.settings.init_pmss_settings()
-learning_observer.settings.load_settings(settings)
-```
-
-so when you need custom rulesets, call `init_pmss_settings([...])` first (as
-shown above) and then initialize offline replay.
+The offline module still does not expose a first-class CLI parser like
+`learning_observer.main`; there is a TODO in `offline.py` to add an
+`argparse`-based entrypoint for settings and ruleset arguments.
 
 - `process_file` only accepts study logs ending in `.study.log` or `.study.log.gz` and will reject other log types.
 - If you do not provide a `userid`, a random safe username is generated to avoid inadvertently reusing PII from the log.

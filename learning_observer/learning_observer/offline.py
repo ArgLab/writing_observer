@@ -41,9 +41,16 @@ INTERACTIVE_SETTINGS = {
 }
 
 
-def init(settings=INTERACTIVE_SETTINGS):
+def init(settings=INTERACTIVE_SETTINGS, pmss_rulesets=None):
     '''
     Initialize the Learning Observer library.
+
+    Args:
+        settings (str|dict): Path to a YAML settings file or an in-memory
+            settings dictionary.
+        pmss_rulesets (list[str]|None): Optional PMSS ruleset files/directories
+            to initialize before loading settings. If omitted, defaults to the
+            standard PMSS initialization behavior.
 
     Returns:
         None
@@ -55,8 +62,10 @@ def init(settings=INTERACTIVE_SETTINGS):
     # anything before we've loaded the settings. This might not be necessary,
     # depending on the (still-changing) startup order
     learning_observer.log_event.DEBUG_LOG_LEVEL = learning_observer.log_event.LogLevel.NONE
-    # TODO: Allow offline callers to pass PMSS ruleset files or directories.
-    learning_observer.settings.init_pmss_settings()
+    learning_observer.settings.init_pmss_settings(pmss_rulesets)
+    # TODO: Add an argparse-powered CLI entrypoint (similar to main.py) so
+    # offline workflows can accept settings and PMSS rulesets directly from
+    # command-line arguments without wrapper scripts.
     learning_observer.settings.load_settings(settings)
     learning_observer.prestartup.startup_checks_and_init()
     learning_observer.kvs.kvs_startup_check()  # Set up the KVS
