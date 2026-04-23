@@ -65,6 +65,7 @@ that the core approach and APIs are correct.
 We have a short guide to [installing the system](docs/tutorials/install.md).
 Getting the base system working is pretty easy. To create a new module
 for the system to use, check out our [cookiecutter module guide](docs/tutorials/cookiecutter-module.md).
+For a current package/module overview, see the [module inventory](docs/reference/module_inventory.md).
 
 ### System requirements
 
