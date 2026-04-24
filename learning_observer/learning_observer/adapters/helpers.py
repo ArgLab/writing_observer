@@ -18,16 +18,13 @@ def rename_json_keys(source, replacements):
     >>> source = {
     ...     "event-type": "blog",
     ...     "writing-log": "foobar",
-    }
+    ... }
     >>> replacements = {
     ...     "event-type": "event_type",
     ...     "writing-log": "writing_log",
     ... }
     >>> rename_json_keys(source, replacements)
-    {
-        "event_type": "blog",
-        "writing_log": "foobar",
-    }
+    {'event_type': 'blog', 'writing_log': 'foobar'}
     '''
     if isinstance(source, dict):
         for key, value in list(source.items()):

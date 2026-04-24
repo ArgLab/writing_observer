@@ -18,16 +18,14 @@ https://github.com/encode/broadcaster
 TODO this module is no longer being used by the LO system.
 This should be removed.
 '''
-import sys
-
 import learning_observer.settings as settings
 from learning_observer.log_event import debug_log
 
 try:
     PUBSUB = settings.settings['pubsub']['type']
-except KeyError:
-    print("Pub-sub configuration missing from configuration file.")
-    sys.exit(-1)
+except (TypeError, KeyError):
+    debug_log("Pub-sub configuration missing from configuration file; defaulting to stub.")
+    PUBSUB = 'stub'
 
 if PUBSUB == 'xmpp':
     import learning_observer.pubsub.receivexmpp

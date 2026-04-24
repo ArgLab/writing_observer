@@ -19,7 +19,7 @@ import learning_observer.settings
 import learning_observer.stream_analytics.fields
 import learning_observer.stream_analytics.helpers
 from learning_observer.log_event import debug_log
-from learning_observer.util import get_nested_dict_value, clean_json, ensure_async_generator, async_zip
+from learning_observer.util import get_nested_dict_value, clean_json, ensure_async_generator, async_zip, async_generator_to_list
 from learning_observer.communication_protocol.exception import DAGExecutionException
 
 
@@ -1133,7 +1133,5 @@ async def execute_dag(endpoint, parameters, functions, target_exports):
 
 if __name__ == "__main__":
     import doctest
-    # This function is used by doctests
-    from learning_observer.util import async_generator_to_list
 
     doctest.testmod(optionflags=doctest.ELLIPSIS)

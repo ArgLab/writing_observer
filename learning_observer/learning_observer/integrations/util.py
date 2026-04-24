@@ -64,7 +64,7 @@ def extract_parameters_from_format_string(format_string):
     '''
     Extracts parameters from a format string. E.g.
 
-    >>> ("hello {hi} my {bye}")]
+    >>> extract_parameters_from_format_string("hello {hi} my {bye}")
     ['hi', 'bye']
     '''
     # The parse returns a lot of context, which we discard. In particular, the
