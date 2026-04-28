@@ -52,7 +52,7 @@ def fully_qualified_function_name(func):
     that function. E.g.:
 
     >>> from math import sin
-    >>> fully_qualified_function_name(math.sin)
+    >>> fully_qualified_function_name(sin)
     'math.sin'
 
     This is helpful for then giving unique names to analytics modules. Each module can
@@ -147,11 +147,12 @@ def make_key(func, key_dict, state_type):
     Into a unique string
 
     For example:
-    >>> make_key(
-          some_module.reducer,
-          {h.KeyField.STUDENT: 123},
-          h.KeyStateType.INTERNAL
-    )
+    >>> from learning_observer.stream_analytics.fields import KeyField, KeyStateType
+    >>> def reducer(_):
+    ...     return _
+    >>> reducer.__module__ = 'some_module'
+    >>> reducer.__qualname__ = 'reducer'
+    >>> make_key(reducer, {KeyField.STUDENT: 123}, KeyStateType.INTERNAL)
     'Internal,some_module.reducer,STUDENT:123'
     '''
     # pylint: disable=isinstance-second-argument-not-valid-type

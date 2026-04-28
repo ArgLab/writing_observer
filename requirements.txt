@@ -11,7 +11,7 @@ dash
 dash_renderjson
 docopt
 dash-bootstrap-components
-tsvx @ git+https://github.com/pmitros/tsvx.git@09bf7f33107f66413d929075a8b54c36ca581dae#egg=tsvx
+tsvx @ https://codeload.github.com/pmitros/tsvx/tar.gz/f883c63892dc383cc15d1d14c05a33d16fb92317
 ipython
 ipykernel
 jsonschema
