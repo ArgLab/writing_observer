@@ -85,3 +85,13 @@ async def fetch_doc_at_timestamp(overall_timestamps, kwargs=None):
         target_ts = sorted_ts[bisect_index]
         student['doc_id'] = timestamps[target_ts]
         yield student
+
+
+@learning_observer.communication_protocol.integration.publish_function('writing_observer.single_student_from_roster')
+def single_student_from_roster(roster, student_id):
+    '''
+    Return the roster entry for a single student id.
+
+    We use roster data as the source of profile truth for dashboards.
+    '''
+    return [student for student in roster if student.get('user_id') == student_id]

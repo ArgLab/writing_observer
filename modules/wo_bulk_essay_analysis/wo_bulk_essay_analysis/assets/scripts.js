@@ -18,6 +18,62 @@ function fetchSelectedItemsFromOptions (value, options, type) {
   }, []);
 }
 
+function createPasteBadge (children, color = 'secondary', className = 'me-1') {
+  return createDashComponent(
+    DASH_BOOTSTRAP_COMPONENTS,
+    'Badge',
+    { children, color, className }
+  );
+}
+
+function createBinnedPasteEventsBadge (document) {
+  const lengthBins = document?.length_bins ?? {};
+  const smallPastes = lengthBins.short_1_20 ?? 0;
+  const mediumPastes = lengthBins.medium_21_200 ?? 0;
+  const largePastes = lengthBins.long_201_plus ?? 0;
+  const largeColor = largePastes > 0 ? 'warning' : 'secondary';
+  const mediumColor = mediumPastes > 0 ? 'warning' : 'secondary';
+
+  return createDashComponent(
+    DASH_HTML_COMPONENTS,
+    'Div',
+    {
+      children: [
+        createPasteBadge(`${smallPastes} small (<20)`, 'secondary'),
+        createPasteBadge(`${mediumPastes} medium (21-200)`, mediumColor),
+        createPasteBadge(`${largePastes} large (201+)`, largeColor)
+      ],
+      className: 'd-inline'
+    }
+  );
+}
+
+function createPasteMetricComponent (document, metricId) {
+  const pasteCount = document?.pastes_with_length ?? 0;
+  const totalPasteChars = document?.total_paste_chars ?? 0;
+
+  switch (metricId) {
+    case 'paste_events':
+      return createPasteBadge(`${pasteCount} pastes`, pasteCount > 0 ? 'warning' : 'secondary', 'me-1');
+    case 'paste_bins':
+      return createBinnedPasteEventsBadge(document);
+    case 'total_paste_chars':
+      const totalPastedColor = totalPasteChars > 500 ? 'danger' : totalPasteChars > 100 ? 'warning' : 'secondary';
+      return createPasteBadge(`${totalPasteChars} pasted chars`, totalPastedColor, 'me-1');
+    case 'paste':
+      return createPasteMetricComponent(document, 'paste_events');
+    default:
+      return null;
+  }
+}
+
+window.WOPasteMetricHelpers = {
+  createPasteBadge,
+  createBinnedPasteEventsBadge,
+  createPasteMetricComponent
+};
+
+
 function createProcessTags (document, metrics) {
   const children = metrics.map(metric => {
     switch (metric.id) {
@@ -32,10 +88,22 @@ function createProcessTags (document, metrics) {
           DASH_BOOTSTRAP_COMPONENTS, 'Badge',
           { children: document[metric.id], color }
         );
+      case 'paste_events':
+      case 'paste_bins':
+      case 'total_paste_chars':
+      case 'paste':
+        return window.WOPasteMetricHelpers.createPasteMetricComponent(document, metric.id);
+      case 'copy':
+        const copyCount = document?.copy_count ?? 0;
+        const copyColor = copyCount > 0 ? 'primary' : 'secondary'
+        return createDashComponent(
+          DASH_BOOTSTRAP_COMPONENTS, 'Badge',
+          { children: `${copyCount} copies`, color: copyColor }
+        );
       default:
         break;
     }
-  });
+  }).filter(Boolean);
   return createDashComponent(DASH_HTML_COMPONENTS, 'Div', { children, className: 'sticky-top' });
 }
 
@@ -214,7 +282,7 @@ const fileTextExtractors = {
   docx: extractDOCX
 };
 
-const AIAssistantLoadingQueries = ['gpt_bulk', 'time_on_task', 'activity'];
+const AIAssistantLoadingQueries = ['gpt_bulk', 'time_on_task', 'activity', 'paste_metrics', 'copy_cut_metrics'];
 
 // ── Walkthrough step definitions ──────────────────────────────────────
 const BULK_WALKTHROUGH_STEPS = [
@@ -633,7 +701,7 @@ window.dash_clientside.bulk_essay_feedback = {
       const message = {
         wo: {
           execution_dag: 'writing_observer',
-          target_exports: ['gpt_bulk', 'document_list', 'document_sources', 'time_on_task', 'activity'],
+          target_exports: ['gpt_bulk', 'document_list', 'document_sources', 'time_on_task', 'activity', 'paste_metrics', 'copy_cut_metrics'],
           kwargs: decoded
         }
       };

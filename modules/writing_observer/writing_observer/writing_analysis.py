@@ -11,6 +11,7 @@ import pmss
 import re
 import time
 
+import writing_observer.copy_paste_utils
 import writing_observer.reconstruct_doc
 
 import learning_observer.adapters
@@ -35,6 +36,21 @@ import learning_observer.util
 # (e.g. all the numbers would go up/down 20%, but behavior was
 # substantatively identical).
 
+pmss.register_field(
+    name='time_on_task_threshold',
+    type=pmss.pmsstypes.TYPES.integer,
+    description='Maximum time to pass before marking a session as over. '\
+        'Should be 60-300 seconds in production, but 5 seconds is nice for '\
+        'debugging in a local deployment.',
+    default=60
+)
+pmss.register_field(
+    name='binned_time_on_task_bin_size',
+    type=pmss.pmsstypes.TYPES.integer,
+    description='How large (in seconds) to make timestamp bins when '\
+        'recording binned time on task.',
+    default=600
+)
 pmss.register_field(
     name='activity_threshold',
     type=pmss.pmsstypes.TYPES.integer,
@@ -149,6 +165,28 @@ async def event_count(event, internal_state):
 
     state = {"count": internal_state.get('count', 0) + 1}
 
+    return state, state
+
+
+@kvs_pipeline(
+    scope=gdoc_scope,
+    null_state=writing_observer.copy_paste_utils.default_paste_state()
+)
+async def lo_paste_reducer(event, internal_state):
+    state = writing_observer.copy_paste_utils.update_paste_state(event, internal_state)
+    if not state:
+        return False, False
+    return state, state
+
+
+@kvs_pipeline(
+    scope=gdoc_scope,
+    null_state=writing_observer.copy_paste_utils.default_copy_cut_state()
+)
+async def lo_copy_cut_reducer(event, internal_state):
+    state = writing_observer.copy_paste_utils.update_copy_cut_state(event, internal_state)
+    if not state:
+        return False, False
     return state, state
 
 
@@ -449,7 +487,7 @@ async def last_document(event, internal_state):
 # Document URls are as follows:
 #  https://docs.google.com/document/d/18JAnmxzVD_lGSfa8t6Se66KLZm30YFrC_4M-D2zdYG4/edit
 
-DOC_URL_re = re.compile("^https://docs.google.com/document/d/(?P<DOCID>[^/\s]+)/(?P<ACT>[a-zA-Z]+)")  # noqa: W605 \s is invalid escape
+DOC_URL_re = re.compile("^https://docs.google.com/document/d/(?P<DOCID>[^/\\s]+)/(?P<ACT>[a-zA-Z]+)")
 
 
 def get_doc_id(event):
@@ -481,23 +519,17 @@ def get_doc_id(event):
     if doc_id:
         return doc_id
 
-    # Failing that pull out the url event.
-    # Object_value = event.get('client', {}).get('object', None)
     url = client.get('object', {}).get('url')
     if not url:
         return None
 
-    # Now test if the object has a URL and if that corresponds
-    # to a doc edit/review URL as opposed to their main page.
-    # if so return the id from it.  In the off chance the id
-    # is still not present or is none then this will return
-    # none.
     url_match = DOC_URL_re.match(url)
     if not url_match:
         return None
 
     doc_id = client.get('object', {}).get('id')
     return doc_id
+
 
 def document_link_to_doc_id(event):
     '''

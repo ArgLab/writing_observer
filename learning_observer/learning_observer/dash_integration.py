@@ -204,6 +204,7 @@ def load_dash_pages():
         __name__,
         use_pages=True,
         pages_folder="",
+        meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
         external_stylesheets=all_dash_resources('CSS'),
         external_scripts=all_dash_resources('SCRIPTS'),
         assets_folder=compile_dash_assets(),

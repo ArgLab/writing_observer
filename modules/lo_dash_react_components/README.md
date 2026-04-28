@@ -6,7 +6,7 @@ In Learning Observer, we create React components and generate a Python package f
 
 ### Pre-built installation
 
-These components take a bit of extra infrastructure to build (mainly `node`). If you just with to use these components, without developing new ones or changing current ones, we suggest installing the pre-built package available in the [LO Assets github repository](https://github.com/ETS-Next-Gen/lo_assets/tree/main/lo_dash_react_components).
+These components take a bit of extra infrastructure to build (mainly `node`). If you just with to use these components, without developing new ones or changing current ones, we suggest installing the pre-built package available in the [LO Assets github repository](https://github.com/ArgLab/lo_assets/tree/main/lo_dash_react_components).
 
 ### Requirements
 
