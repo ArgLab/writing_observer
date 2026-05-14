@@ -27,11 +27,11 @@ After build completion, the static export is written to `out/`.
 If you need an artifact for an assets repository, archive the exported files from `out/`:
 
 ```bash
-VERSION_TAG=$(date +%Y%m%d-%H%M%S)
+VERSION_TAG=$(date +%Y%m%d)
 tar -C out -czf "portfolio_diff_${VERSION_TAG}.tar.gz" .
 ```
 
-That creates a tarball in `modules/portfolio_diff` (for example `portfolio_diff-20260710-153010.tar.gz`) containing the static site root.
+That creates a tarball in `modules/portfolio_diff` (for example `portfolio_diff-20260710.tar.gz`) containing the static site root.
 
 You should include copy this to the [`lo_assets` repository](github.com/ArgLab/lo_assets) and update the `portfolio_diff-current.tar.gz` link to point to the new version.
 
