@@ -26,7 +26,7 @@ import learning_observer.webapp_helpers
 import learning_observer.watchdog_observer
 import learning_observer.ipython_integration
 
-from learning_observer.log_event import debug_log
+from learning_observer.log_event import debug_log, set_log_port
 
 pmss.register_field(
     name='port',
@@ -87,6 +87,7 @@ def create_app():
         runmode = settings.pmss_settings.run_mode(types=['config'])
     if port is None and runmode == 'dev':
         port = learning_observer.webapp_helpers.find_open_port()
+    set_log_port(port)
 
     # Check that everything is configured correctly,
     # and initialize anything which needs initialization
