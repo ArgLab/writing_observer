@@ -34,6 +34,14 @@ logic expands directories into sorted file lists, then loads each file as a
 ends in `.pmss`.  Any other file suffix is skipped with a warning so you can
 keep README files or notes alongside the rulesets without breaking startup.
 
+This argument is intended for normal startup entry points too (for example, a
+`Makefile` target or deployment startup scripts), not just ad-hoc local runs.
+For example:
+
+```bash
+python -m learning_observer.main --pmss-rulesets creds.yaml schools.pmss
+```
+
 ## The role of `creds.yaml`
 
 Most installations load configuration from `creds.yaml`.  When the process
