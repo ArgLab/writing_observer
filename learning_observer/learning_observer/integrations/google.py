@@ -161,11 +161,11 @@ def _force_text_length(text, length):
     '''
     Force text to a given length, either concatenating or padding
 
-    >>> force_text_length("Hello", 3)
-    >>> 'Hel'
+    >>> _force_text_length("Hello", 3)
+    'Hel'
 
-    >>> force_text_length("Hello", 13)
-    >>> 'Hello        '
+    >>> _force_text_length("Hello", 13)
+    'Hello        '
     '''
     return text[:length] + " " * (length - len(text))
 
